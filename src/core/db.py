@@ -11,6 +11,11 @@ Tabelas:
 - quotes      : último preço conhecido por ativo (TradingFloors ou manual)
 - settings    : preferências do usuário (JSON por seção)
 - kv          : estado interno (baseline do monitor, última sincronização etc.)
+- orders / order_fills : ordens enviadas ao MT5 ou à conta simulada (Fase 6) e seus preenchimentos
+- automation_log       : cada decisão da automação (enviou / bloqueou e por quê)
+- notes                : notas de corretagem importadas (custos reais, IRRF)
+
+`executions.account` separa a conta real da simulada ('paper').
 """
 import sqlite3
 import threading
@@ -120,6 +125,88 @@ MIGRATIONS = [
     CREATE TABLE IF NOT EXISTS kv (
         key TEXT PRIMARY KEY,
         value TEXT
+    );
+    """,
+    # v2 — Fase 6 (ordens via MT5/simulação), contas real/paper e notas de corretagem
+    """
+    ALTER TABLE executions ADD COLUMN account TEXT NOT NULL DEFAULT 'real';
+    ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
+    ALTER TABLE executions ADD COLUMN order_id INTEGER;
+    ALTER TABLE executions ADD COLUMN note_id INTEGER;
+    ALTER TABLE executions ADD COLUMN fees_source TEXT NOT NULL DEFAULT 'manual';
+    CREATE INDEX IF NOT EXISTS idx_exec_account ON executions(account, executed_at);
+
+    CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account TEXT NOT NULL CHECK (account IN ('real', 'paper')),
+        broker TEXT NOT NULL,
+        origin TEXT NOT NULL CHECK (origin IN ('manual', 'auto')),
+        purpose TEXT NOT NULL CHECK (purpose IN ('entry', 'exit', 'other')),
+        signal_id TEXT,
+        cycle_id TEXT,
+        ticker TEXT NOT NULL,
+        asset_class TEXT NOT NULL DEFAULT 'OUTRO',
+        side TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
+        quantity REAL NOT NULL CHECK (quantity > 0),
+        order_type TEXT NOT NULL CHECK (order_type IN ('limit', 'market')),
+        limit_price REAL,
+        status TEXT NOT NULL,
+        broker_order_id TEXT,
+        filled_qty REAL NOT NULL DEFAULT 0,
+        avg_fill_price REAL,
+        message TEXT,
+        risk_json TEXT,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        updated_at TEXT,
+        closed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+    CREATE INDEX IF NOT EXISTS idx_orders_signal ON orders(signal_id);
+
+    CREATE TABLE IF NOT EXISTS order_fills (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        broker_fill_id TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        price REAL NOT NULL,
+        fees REAL NOT NULL DEFAULT 0,
+        filled_at TEXT NOT NULL,
+        execution_id INTEGER,
+        UNIQUE (order_id, broker_fill_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS automation_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        at TEXT NOT NULL,
+        account TEXT NOT NULL,
+        action TEXT NOT NULL,
+        decision TEXT NOT NULL,
+        signal_id TEXT,
+        order_id INTEGER,
+        ticker TEXT,
+        reason TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        broker TEXT NOT NULL,
+        number TEXT NOT NULL,
+        trade_date TEXT NOT NULL,
+        settlement_date TEXT,
+        file_name TEXT,
+        file_hash TEXT,
+        gross_value REAL,
+        net_value REAL,
+        total_costs REAL,
+        brokerage REAL,
+        b3_fees REAL,
+        taxes REAL,
+        irrf REAL,
+        fees_json TEXT,
+        trades_json TEXT,
+        imported_at TEXT NOT NULL,
+        UNIQUE (broker, number, trade_date)
     );
     """,
 ]

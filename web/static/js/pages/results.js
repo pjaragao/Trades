@@ -107,23 +107,28 @@ function drawChart(canvas, curve, capital) {
 
 export default {
   title: 'Resultados',
-  async mount(root) {
+  async mount(root, params) {
     let period = 'month';
+    let account = params.get('conta') === 'simulacao' ? 'paper' : 'real';
     root.innerHTML = `
       <div class="page-head"><div><h1>Resultados</h1><p class="sub">Seus números reais — preço e quantidade que você executou, com custos.</p></div>
         <div class="row wrap">
+          <div class="segmented" id="acct"><button data-a="real">Real</button><button data-a="paper">Simulação</button></div>
           <div class="segmented" id="period">${PERIODS.map(([k, l]) => `<button data-p="${k}">${l}</button>`).join('')}</div>
-          <a class="btn btn-sm" href="/api/export/operacoes.csv">${icon('download')} Operações CSV</a>
-          <a class="btn btn-sm" href="/api/export/execucoes.csv">${icon('download')} Execuções CSV</a>
+          <a class="btn btn-sm" id="csv-op" href="/api/export/operacoes.csv">${icon('download')} Operações CSV</a>
+          <a class="btn btn-sm" id="csv-ex" href="/api/export/execucoes.csv">${icon('download')} Execuções CSV</a>
         </div></div>
       <div id="res">${loading()}</div>`;
     const res = root.querySelector('#res');
 
     const load = async () => {
       root.querySelectorAll('#period button').forEach((b) => b.classList.toggle('active', b.dataset.p === period));
+      root.querySelectorAll('#acct button').forEach((b) => b.classList.toggle('active', b.dataset.a === account));
+      root.querySelector('#csv-op').href = `/api/export/operacoes.csv?account=${account}`;
+      root.querySelector('#csv-ex').href = `/api/export/execucoes.csv?account=${account}`;
       res.innerHTML = loading();
       try {
-        const [r, tax] = await Promise.all([get(`/api/results${qs(range(period))}`), get('/api/results/tax')]);
+        const [r, tax] = await Promise.all([get(`/api/results${qs({ ...range(period), account })}`), get('/api/results/tax')]);
         res.innerHTML = `
           ${kpis(r)}
           <section class="section card">
@@ -132,13 +137,14 @@ export default {
           </section>
           <section class="section"><div class="section-title"><h2>Desempenho por analista</h2></div><div class="card">${byTrader(r.by_trader)}</div></section>
           <section class="section"><div class="section-title"><h2>Diário de operações <span class="count">${r.closed_trades.length}</span></h2></div><div class="card">${journal(r.closed_trades)}</div></section>
-          <section class="section">
+          ${account === 'real' ? `<section class="section">
             <div class="section-title"><h2>Imposto de renda (DARF) <span class="badge badge-est">Estimativa</span></h2>
-              <span class="muted">Total a pagar no histórico: <strong class="mono">${f.brl(tax.total_darf)}</strong></span></div>
+              <span class="row"><span class="muted">Total a pagar no histórico: <strong class="mono">${f.brl(tax.total_darf)}</strong></span>
+              <button class="btn btn-sm" data-notes>${icon('download')} Importar notas de corretagem</button></span></div>
             <div class="card">${taxTable(tax)}</div>
             <ul class="notes mt-3">${tax.notes.map((n) => `<li class="note info">${icon('info')}<span>${esc(n)}</span></li>`).join('')}
               <li class="note info">${icon('info')}<span>Swing: 15% · Day trade: 20% · Opções não têm isenção de R$ 20 mil · Código DARF 6015 · Valores abaixo de R$ 10 acumulam.</span></li></ul>
-          </section>`;
+          </section>` : ''}`;
         const cv = res.querySelector('#eq');
         if (cv) drawChart(cv, r.equity_curve, r.capital);
       } catch (e) {
@@ -146,6 +152,17 @@ export default {
       }
     };
 
+    root.addEventListener('click', async (e) => {
+      if (!e.target.closest('[data-notes]')) return;
+      const { openNotesImport } = await import('../components/notes_import.js');
+      openNotesImport();
+    });
+    root.querySelector('#acct').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-a]');
+      if (!b) return;
+      account = b.dataset.a;
+      load();
+    });
     root.querySelector('#period').addEventListener('click', (e) => {
       const b = e.target.closest('[data-p]');
       if (!b) return;

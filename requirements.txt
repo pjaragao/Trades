@@ -10,8 +10,12 @@ pandas>=2.0
 numpy>=1.26
 yfinance>=0.2.40
 
-# Testes
+# Notas de corretagem (PDF SINACOR, inclusive com senha)
+pdfplumber>=0.11
+
+# Testes (reportlab gera PDFs de nota sintéticos)
 pytest>=8.0
+reportlab>=4.0
 
 # Opcionais:
 #   requirements-lab.txt  -> previsão IA (torch + timesfm)

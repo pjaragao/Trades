@@ -17,10 +17,12 @@ import yaml
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
-SETTINGS_YAML = ROOT / "config" / "settings.yaml"
-ENV_FILE = ROOT / "config" / ".env"
-DATABASE_DIR = ROOT / "database"
-DEFAULT_DB_PATH = DATABASE_DIR / "app.db"
+CONFIG_DIR = Path(os.getenv("COPILOTO_CONFIG_DIR") or ROOT / "config")
+SETTINGS_YAML = CONFIG_DIR / "settings.yaml"
+ENV_FILE = CONFIG_DIR / ".env"
+# Diretório de dados (banco, notas importadas). No Docker: volume em /data.
+DATABASE_DIR = Path(os.getenv("COPILOTO_DATA_DIR") or ROOT / "database")
+DEFAULT_DB_PATH = Path(os.getenv("COPILOTO_DB") or DATABASE_DIR / "app.db")
 
 ASSET_CLASSES = ["OPCAO", "ACAO", "FUTURO", "FOREX", "INDICE", "COMMODITY", "CRIPTO", "OUTRO"]
 
@@ -57,6 +59,23 @@ DEFAULT_PREFS: Dict[str, Any] = {
     "broker": {
         "name": "",
         "order_validity": "Dia",
+    },
+    "execution": {
+        # off: só manual | paper: ordens vão para a conta simulada | live: ordens reais no MT5
+        "mode": "off",
+        "order_type": "limit",
+        "auto": {
+            "armed": False,
+            "entries": True,
+            "exits": True,
+            "max_orders_per_day": 4,
+            "max_daily_loss": 300.0,
+            "max_exposure_pct": 60.0,
+            "max_trade_value": 1500.0,
+            "only_copyable": True,
+            "max_signal_age_minutes": 30,
+            "cancel_after_minutes": 30,
+        },
     },
 }
 
@@ -104,9 +123,31 @@ def monitor_poll_seconds() -> int:
     return max(5, int(value))
 
 
-def execution_flags() -> Dict[str, bool]:
-    ex = load_yaml().get("execution", {})
-    return {"enabled": bool(ex.get("enabled", False)), "dry_run": bool(ex.get("dry_run", True))}
+def _env_bool(name: str) -> Optional[bool]:
+    v = os.getenv(name)
+    if v is None or v.strip() == "":
+        return None
+    return v.strip().lower() in ("1", "true", "yes", "sim", "on")
+
+
+def execution_flags() -> Dict[str, Any]:
+    """
+    Trava de segurança da execução REAL. Só liga com `execution.enabled: true` no settings.yaml
+    ou EXECUTION_ENABLED=true no ambiente (Docker). A tela nunca consegue ligar sozinha.
+    """
+    load_env()
+    ex = load_yaml().get("execution", {}) or {}
+    env_enabled = _env_bool("EXECUTION_ENABLED")
+    enabled = env_enabled if env_enabled is not None else bool(ex.get("enabled", False))
+    return {
+        "enabled": enabled,
+        "dry_run": bool(ex.get("dry_run", True)),
+        "broker": (os.getenv("EXECUTION_BROKER") or ex.get("broker") or "mt5_remote").strip(),
+        "mt5_agent_url": (os.getenv("MT5_AGENT_URL") or ex.get("mt5_agent_url") or "").strip().rstrip("/"),
+        "mt5_agent_token": os.getenv("MT5_AGENT_TOKEN", "").strip(),
+        "mt5_terminal_path": (os.getenv("MT5_TERMINAL_PATH") or (load_yaml().get("mt5", {}) or {}).get("terminal_path") or "").strip(),
+        "magic_number": int((load_yaml().get("mt5", {}) or {}).get("magic_number", 998877)),
+    }
 
 
 def telegram_credentials() -> Tuple[str, str]:
@@ -199,4 +240,19 @@ def _validate_prefs(p: Dict[str, Any]) -> Dict[str, Any]:
     b = out["broker"]
     b["name"] = str(b.get("name") or "").strip()[:60]
     b["order_validity"] = str(b.get("order_validity") or "Dia").strip()[:30]
+
+    ex = out["execution"]
+    ex["mode"] = ex.get("mode") if ex.get("mode") in ("off", "paper", "live") else "off"
+    ex["order_type"] = ex.get("order_type") if ex.get("order_type") in ("limit", "market") else "limit"
+    au, dau = ex["auto"], d["execution"]["auto"]
+    for k in ("armed", "entries", "exits", "only_copyable"):
+        au[k] = bool(au.get(k))
+    au["max_orders_per_day"] = int(_num(au.get("max_orders_per_day"), dau["max_orders_per_day"], 0, 100))
+    au["max_daily_loss"] = _num(au.get("max_daily_loss"), dau["max_daily_loss"], 0)
+    au["max_exposure_pct"] = _num(au.get("max_exposure_pct"), dau["max_exposure_pct"], 0, 100)
+    au["max_trade_value"] = _num(au.get("max_trade_value"), dau["max_trade_value"], 0)
+    au["max_signal_age_minutes"] = int(_num(au.get("max_signal_age_minutes"), dau["max_signal_age_minutes"], 1, 24 * 60))
+    au["cancel_after_minutes"] = int(_num(au.get("cancel_after_minutes"), dau["cancel_after_minutes"], 1, 24 * 60))
+    if ex["mode"] == "off":
+        au["armed"] = False
     return out

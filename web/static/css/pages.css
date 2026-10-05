@@ -107,3 +107,7 @@
 .kb-doc { white-space: pre-wrap; font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted); }
 .kb-doc h1, .kb-doc h2, .kb-doc h3 { color: var(--text); margin: var(--s4) 0 var(--s2); }
 .kb-doc ul { padding-left: 1.2em; }
+.ticket-orders { margin: var(--s3) var(--s5) 0; padding: var(--s2) var(--s3); border-radius: var(--r-md); background: var(--info-soft); font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 4px; }
+.settings-grid .span-all { grid-column: 1 / -1; }
+.form-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .form-grid-3 { grid-template-columns: 1fr; } }

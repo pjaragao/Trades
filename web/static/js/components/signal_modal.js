@@ -76,7 +76,7 @@ export async function openSignalModal(id) {
 
   bindTickets(m.el);
   m.el.addEventListener('click', async (e) => {
-    if (e.target.closest('[data-action=executed]')) m.close();
+    if (e.target.closest('[data-action=executed], [data-action=send]')) m.close();
     if (e.target.closest('.menu [data-reason], .menu [data-min]')) setTimeout(m.close, 50);
     if (e.target.closest('[data-clear]')) {
       try {

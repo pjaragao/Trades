@@ -114,6 +114,7 @@ class SignalMonitor:
                 result.update(self.poll_once(api))
                 self._state.update(state="live", last_ok_at=now_iso(), last_error=None, consecutive_errors=0, last_result=_summ(result))
                 db.kv_set("last_poll_ok_at", self._state["last_ok_at"])
+                self._run_automation(result)
                 return result
             except TFError as exc:
                 self._fail(str(exc))
@@ -121,6 +122,18 @@ class SignalMonitor:
                 log.error("Erro no monitor: %s\n%s", exc, traceback.format_exc())
                 self._fail(f"Erro interno: {exc}")
             return {}
+
+    def _run_automation(self, result: Dict[str, Any]) -> None:
+        """Fase 6: sincroniza ordens abertas e, se armada, deixa a automação agir neste ciclo."""
+        try:
+            from src.execution import automation
+
+            acts = automation.run(result)
+            if acts:
+                result["automation"] = [{"type": a["type"], "order_id": a["order"]["id"]} for a in acts]
+                alerts.dispatch_pending()
+        except Exception as exc:
+            log.error("Erro na automação: %s | %s", exc, traceback.format_exc())
 
     def _fail(self, msg: str) -> None:
         self._state["last_error"] = msg

@@ -98,6 +98,7 @@ export function openModal({ title, body = '', foot = '', wide = false, onClose }
 }
 
 export const modalOpen = () => modalStack.length > 0;
+export function closeAllModals() { [...modalStack].reverse().forEach((m) => m.close()); }
 
 export function confirmDialog({ title = 'Confirmar', message, confirmText = 'Confirmar', danger = false }) {
   return new Promise((resolve) => {

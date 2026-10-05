@@ -19,7 +19,8 @@ def _system():
         "tf_email": email,
         "telegram_configured": alerts.telegram_configured(),
         "poll_seconds": monitor_poll_seconds(),
-        "execution": execution_flags(),
+        "execution": {**{k: v for k, v in execution_flags().items() if k != "mt5_agent_token"},
+                      "agent_token_set": bool(execution_flags()["mt5_agent_token"])},
         "db_path": str(db.db_path()),
         "asset_classes": ASSET_CLASS_LABELS,
         "traders": traders,
@@ -34,6 +35,9 @@ def get_settings():
 @bp.put("/settings")
 def put_settings():
     data = request.get_json(silent=True) or {}
+    ex = data.get("execution") or {}
+    if ex.get("mode") == "live" and not execution_flags()["enabled"]:
+        raise ValueError("Modo real bloqueado: ligue execution.enabled no settings.yaml ou EXECUTION_ENABLED=true no Docker.")
     prefs = update_prefs(data)
     performance.invalidate_cache()
     get_monitor().trigger()

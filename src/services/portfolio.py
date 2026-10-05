@@ -45,10 +45,10 @@ def _pct(a: Optional[float], b: Optional[float]) -> Optional[float]:
     return round((a / b - 1) * 100, 2)
 
 
-def positions(conn=None, led: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def positions(conn=None, led: Optional[Dict[str, Any]] = None, account: str = "real") -> List[Dict[str, Any]]:
     prefs = get_prefs(conn)
     with db.connection(conn) as c:
-        led = led or journal.ledger(c)
+        led = led or journal.ledger(c, account)
         quotes = _quotes(c)
         cycles = {cy["id"]: cy for cy in led["cycles"]}
         all_ids = sorted({sid for p in led["positions"] for sid in p["signal_ids"]})
@@ -112,22 +112,23 @@ def positions(conn=None, led: Optional[Dict[str, Any]] = None) -> List[Dict[str,
                 "signal_return_pct": (primary.get("return_final_pct") if exit_pending else primary.get("return_now_pct")) if primary else None,
                 "exit_pending": exit_pending,
                 "exit_kept": exit_kept,
+                "account": account,
                 "alerts": alerts,
             })
     out.sort(key=lambda x: (not x["exit_pending"], x["opened_at"] or ""))
     return out
 
 
-def exposure(conn=None, led: Optional[Dict[str, Any]] = None) -> float:
-    led = led or journal.ledger(conn)
+def exposure(conn=None, led: Optional[Dict[str, Any]] = None, account: str = "real") -> float:
+    led = led or journal.ledger(conn, account)
     return round(sum(p["invested"] for p in led["positions"]), 2)
 
 
-def summary(conn=None) -> Dict[str, Any]:
+def summary(conn=None, account: str = "real") -> Dict[str, Any]:
     prefs = get_prefs(conn)
     with db.connection(conn) as c:
-        led = journal.ledger(c)
-        pos = positions(c, led)
+        led = journal.ledger(c, account)
+        pos = positions(c, led, account)
     today = now_brt().date().isoformat()
     month = today[:7]
     invested = round(sum(p["invested"] for p in led["positions"]), 2)
@@ -146,6 +147,7 @@ def summary(conn=None) -> Dict[str, Any]:
         "realized_month": round(sum(e["pnl"] for e in led["events"] if e["date"].startswith(month)), 2),
         "realized_total": realized_total,
         "equity": round(capital + realized_total, 2),
+        "account": account,
     }
 
 

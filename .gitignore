@@ -27,3 +27,9 @@ Thumbs.db
 
 # Configuração local do preview (caminhos desta máquina)
 .claude/launch.json
+
+# Docker
+/.env
+data/
+.secret_key
+**/.secret_key

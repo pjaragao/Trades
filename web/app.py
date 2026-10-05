@@ -18,6 +18,7 @@ WEB_DIR = Path(__file__).resolve().parent
 def create_app(start_monitor: bool = True, db_path=None) -> Flask:
     app = Flask(__name__, template_folder=str(WEB_DIR / "templates"), static_folder=str(WEB_DIR / "static"))
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0  # sempre revalida JS/CSS (módulos ES sem build)
+    app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # upload de notas de corretagem
     app.json.ensure_ascii = False
     app.json.sort_keys = False
 
@@ -26,15 +27,21 @@ def create_app(start_monitor: bool = True, db_path=None) -> Flask:
     else:
         db.init_db()
 
+    from web.auth import init_auth
+
+    init_auth(app)
+
     from web.api.alerts_api import bp as alerts_bp
     from web.api.core_api import bp as core_bp
+    from web.api.execution_api import bp as execution_bp
+    from web.api.notes_api import bp as notes_bp
     from web.api.lab_api import bp as lab_bp
     from web.api.portfolio_api import bp as portfolio_bp
     from web.api.results_api import bp as results_bp
     from web.api.settings_api import bp as settings_bp
     from web.api.signals_api import bp as signals_bp
 
-    for bp in (core_bp, signals_bp, portfolio_bp, alerts_bp, settings_bp, results_bp, lab_bp):
+    for bp in (core_bp, signals_bp, portfolio_bp, alerts_bp, settings_bp, results_bp, lab_bp, execution_bp, notes_bp):
         app.register_blueprint(bp)
 
     @app.errorhandler(ValueError)

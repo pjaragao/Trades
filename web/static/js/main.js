@@ -3,7 +3,7 @@ import { get, post } from './api.js';
 import * as f from './format.js';
 import { emit, on, state } from './state.js';
 import { handleNewAlerts, initLastSeen } from './notify.js';
-import { esc, icon, toast, toastError } from './ui.js';
+import { closeAllModals, esc, icon, toast, toastError } from './ui.js';
 import { openSignalModal } from './components/signal_modal.js';
 
 import today from './pages/today.js';
@@ -46,6 +46,7 @@ async function route() {
   document.getElementById('topbar-title').textContent = r.longLabel || r.label;
   document.title = `${r.longLabel || r.label} · Copiloto de Trades`;
   if (unmount) { try { unmount(); } catch { /* ignore */ } unmount = null; }
+  closeAllModals();
   const view = document.getElementById('view');
   const root = document.createElement('div');
   view.replaceChildren(root);
@@ -81,11 +82,20 @@ function marketChip(mk) {
   return `<span class="chip" title="${esc(mk.detail)}"><span class="dot ${dot}"></span><strong>${esc(mk.label)}</strong><span>${esc(mk.detail)}</span></span>`;
 }
 
+function execChip(ex) {
+  if (!ex || ex.mode === 'off') return '';
+  const live = ex.mode === 'live';
+  const dot = !ex.can_send ? 'bad' : ex.armed ? (live ? 'bad pulse' : 'warn pulse') : (live ? 'warn' : 'ok');
+  const label = `${live ? 'MT5 real' : 'Simulação'}${ex.armed ? ' · automação armada' : ''}`;
+  return `<span class="chip chip-button" data-go="configuracoes" title="${esc(ex.reason || 'Execução de ordens')}"><span class="dot ${dot}"></span><strong>${esc(label)}</strong></span>`;
+}
+
 function renderTopbar(st) {
   const p = st.portfolio;
   document.getElementById('topbar-chips').innerHTML = `
     ${marketChip(st.market)}
     ${monitorChip(st.monitor)}
+    ${execChip(st.execution)}
     <span class="chip chip-button" data-go="carteira" title="Capital livre / total"><span>Capital</span><strong class="mono">${f.brl(p.free, { dec: 0 })}</strong><span class="faint">/ ${f.brl(p.capital, { dec: 0 })}</span></span>
     <span class="chip chip-button" data-go="resultados" title="Resultado realizado hoje · P&L em aberto"><span>Hoje</span><strong class="mono ${f.tone(p.realized_today)}">${f.brl(p.realized_today, { sign: true, dec: 0 })}</strong><span class="faint">aberto</span><strong class="mono ${f.tone(p.unrealized_pnl)}">${f.brl(p.unrealized_pnl, { sign: true, dec: 0 })}</strong></span>`;
   const mon = st.monitor.state;
@@ -107,7 +117,11 @@ function setBadge(path, n, warn = false) {
 }
 
 // ---------------------------------------------------------------- alertas
-const KIND_ICON = { new_signal: ['zap', 'action'], exit_pending: ['exit', 'warn'], reminder: ['snooze', 'action'], stop_hit: ['alert', 'danger'], target_hit: ['check', 'action'], expiry: ['clock', 'danger'], signal_closed: ['info', ''] };
+const KIND_ICON = {
+  new_signal: ['zap', 'action'], exit_pending: ['exit', 'warn'], reminder: ['snooze', 'action'], stop_hit: ['alert', 'danger'],
+  target_hit: ['check', 'action'], expiry: ['clock', 'danger'], signal_closed: ['info', ''], order_filled: ['check', 'action'],
+  order_rejected: ['alert', 'danger'], order_problem: ['alert', 'danger'], auto_order: ['zap', 'warn'], auto_blocked: ['shield', ''],
+};
 
 async function openAlerts() {
   const pop = document.getElementById('alerts-popover');
@@ -130,7 +144,7 @@ async function openAlerts() {
 }
 
 function goToAlert(a) {
-  if (a.kind === 'exit_pending' || a.kind === 'stop_hit' || a.kind === 'target_hit' || a.kind === 'expiry') location.hash = '#/carteira';
+  if (['exit_pending', 'stop_hit', 'target_hit', 'expiry', 'order_filled', 'order_rejected', 'order_problem', 'auto_order', 'auto_blocked'].includes(a.kind)) location.hash = '#/carteira';
   else if (a.signal_id) { location.hash = '#/hoje'; openSignalModal(a.signal_id); }
 }
 
@@ -217,7 +231,8 @@ async function boot() {
   on('data-changed', () => { pollTodayBadge(); pollStatus(); });
 
   if (!location.hash) history.replaceState(null, '', '#/hoje');
-  await Promise.all([route(), pollStatus(), pollTodayBadge()]);
+  await pollStatus();
+  await Promise.all([route(), pollTodayBadge()]);
   setInterval(pollStatus, STATUS_MS);
   setInterval(pollTodayBadge, STATUS_MS * 2);
 }

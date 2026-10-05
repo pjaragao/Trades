@@ -32,10 +32,10 @@ def _slip(mine: Optional[float], ref: Optional[float], worse_if_higher: bool) ->
     return round(pct if worse_if_higher else -pct, 2)
 
 
-def closed_trades(conn=None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
+def closed_trades(conn=None, date_from: Optional[str] = None, date_to: Optional[str] = None, account: str = "real") -> List[Dict[str, Any]]:
     prefs = get_prefs(conn)
     with db.connection(conn) as c:
-        led = journal.ledger(c)
+        led = journal.ledger(c, account)
         sigs = _signals(c, [s for cy in led["cycles"] for s in cy["signal_ids"]], prefs)
     out = []
     for cy in led["cycles"]:
@@ -67,12 +67,12 @@ def closed_trades(conn=None, date_from: Optional[str] = None, date_to: Optional[
     return out
 
 
-def summary(date_from: Optional[str] = None, date_to: Optional[str] = None, conn=None) -> Dict[str, Any]:
+def summary(date_from: Optional[str] = None, date_to: Optional[str] = None, conn=None, account: str = "real") -> Dict[str, Any]:
     prefs = get_prefs(conn)
     capital = float(prefs["capital"]["total"])
     with db.connection(conn) as c:
-        led = journal.ledger(c)
-        trades = closed_trades(c, date_from, date_to)
+        led = journal.ledger(c, account)
+        trades = closed_trades(c, date_from, date_to, account)
 
     events = [e for e in led["events"] if (not date_from or e["date"] >= date_from) and (not date_to or e["date"] <= date_to)]
     pnls = [t["realized_pnl"] for t in trades]
@@ -155,34 +155,36 @@ def summary(date_from: Optional[str] = None, date_to: Optional[str] = None, conn
 def tax_report(conn=None) -> Dict[str, Any]:
     with db.connection(conn) as c:
         led = journal.ledger(c)
-    rows = tax.monthly_tax(led["events"], until=now_brt().date().isoformat()[:7])
+    from src.services.brokerage_notes import irrf_by_month
+
+    rows = tax.monthly_tax(led["events"], until=now_brt().date().isoformat()[:7], irrf_actual=irrf_by_month())
     return {
         "months": rows,
         "total_darf": round(sum(r["darf_value"] for r in rows), 2),
         "notes": [
             "Estimativa. Confira com o relatório da sua corretora/contador antes de pagar.",
             "FIIs, ETFs e BDRs são tratados como ações (a isenção de R$ 20 mil vale só para ações).",
-            "IRRF estimado: 0,005% sobre vendas (swing) e 1% sobre o ganho de day trade.",
+            "IRRF: usa o valor das notas importadas; sem nota, estima 0,005% sobre vendas (swing). Day trade: 1% do ganho (estimado).",
         ],
     }
 
 
-def executions_csv(conn=None) -> str:
+def executions_csv(conn=None, account: str = "real") -> str:
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     w.writerow(["id", "data_hora", "ativo", "lado", "quantidade", "preco", "custos", "classe", "sinal_id", "observacao"])
-    for e in journal.list_executions(conn=conn):
+    for e in journal.list_executions(account=account, conn=conn):
         w.writerow([e["id"], e["executed_at"], e["ticker"], "COMPRA" if e["side"] == "BUY" else "VENDA",
                     _br(e["quantity"]), _br(e["price"]), _br(e["fees"]), e["asset_class"], e["signal_id"] or "", e["note"] or ""])
     return buf.getvalue()
 
 
-def trades_csv(conn=None) -> str:
+def trades_csv(conn=None, account: str = "real") -> str:
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     w.writerow(["ativo", "analista", "direcao", "abertura", "encerramento", "qtd_comprada", "preco_medio_compra",
                 "qtd_vendida", "preco_medio_venda", "custos", "resultado", "resultado_pct", "day_trade", "slippage_entrada_pct"])
-    for t in closed_trades(conn):
+    for t in closed_trades(conn, account=account):
         w.writerow([t["ticker"], t["trader"] or "", t["direction"], t["opened_at"], t["closed_at"], _br(t["buy_qty"]),
                     _br(t["avg_buy"]), _br(t["sell_qty"]), _br(t["avg_sell"]), _br(t["fees"]), _br(t["realized_pnl"]),
                     _br(t["return_pct"]), _br(t["day_trade_pnl"]), _br(t["entry_slippage_pct"])])

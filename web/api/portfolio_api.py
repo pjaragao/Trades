@@ -1,6 +1,7 @@
 """Carteira (posições), execuções registradas e cotações manuais."""
 from flask import Blueprint, jsonify, request
 
+from src.core import db
 from src.core.config import get_prefs
 from src.core.market_hours import now_brt
 from src.services import journal, portfolio
@@ -9,18 +10,30 @@ from src.services.sizing import exit_ticket
 bp = Blueprint("portfolio_api", __name__, url_prefix="/api")
 
 
+def _account():
+    a = request.args.get("account") or "real"
+    return a if a in ("real", "paper") else "real"
+
+
 @bp.get("/portfolio")
 def get_portfolio():
+    from src.execution.orders import open_orders_index
+
     prefs = get_prefs()
-    positions = portfolio.positions()
+    account = _account()
+    positions = portfolio.positions(account=account)
+    idx = open_orders_index(account)
     for p in positions:
         p["exit_ticket"] = exit_ticket(p, p.get("signal"), prefs)
-    return jsonify({"positions": positions, "summary": portfolio.summary()})
+        p["open_orders"] = idx.get(f"cycle:{p['cycle_id']}", []) or idx.get(f"ticker:{p['ticker']}", [])
+    with db.connection() as c:
+        has_paper = c.execute("SELECT 1 FROM executions WHERE account = 'paper' LIMIT 1").fetchone() is not None
+    return jsonify({"positions": positions, "summary": portfolio.summary(account=account), "account": account, "has_paper": has_paper})
 
 
 @bp.get("/executions")
 def list_executions():
-    return jsonify(journal.list_executions(ticker=request.args.get("ticker"), signal_id=request.args.get("signal_id")))
+    return jsonify(journal.list_executions(ticker=request.args.get("ticker"), signal_id=request.args.get("signal_id"), account=_account()))
 
 
 @bp.post("/executions")

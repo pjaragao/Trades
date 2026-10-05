@@ -22,6 +22,10 @@ export async function api(path, { method = 'GET', body, signal } = {}) {
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (res.status === 401 && data && data.login) {
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.hash)}`;
+    throw new ApiError('Faça login novamente.', 401);
+  }
   if (!res.ok) {
     throw new ApiError((data && data.error) || `Erro ${res.status}`, res.status);
   }

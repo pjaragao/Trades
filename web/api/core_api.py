@@ -20,9 +20,21 @@ def status():
         "market": market_status(),
         "portfolio": portfolio.summary(),
         "alerts": {"unread": alerts.unread_count(), "last_id": alerts.last_id()},
-        "execution": execution_flags(),
+        "execution": {**{k: v for k, v in execution_flags().items() if k != "mt5_agent_token"}, **_exec_state()},
         "now": now_brt().isoformat(timespec="seconds"),
     })
+
+
+def _exec_state():
+    from src.execution.orders import execution_state
+
+    st = execution_state()
+    return {"mode": st["mode"], "account": st["account"], "armed": st["armed"], "can_send": st["can_send"], "reason": st["reason"]}
+
+
+@bp.get("/health")
+def health():
+    return jsonify({"ok": True, "version": __version__})
 
 
 @bp.post("/sync")
@@ -78,10 +90,18 @@ def today():
                 s["ticket"] = ticket_for(s, prefs, exposure, profiles)
                 reminders.append(s)
 
+    from src.execution.orders import execution_state, open_orders_index
+
+    ex_state = execution_state(prefs)
+    idx = open_orders_index(ex_state["account"]) if ex_state["mode"] != "off" else {}
+    for s in new_signals + reminders:
+        s["open_orders"] = idx.get(s["id"], [])
+
     exits = []
     for p in positions:
         if p["exit_pending"]:
-            exits.append({**p, "exit_ticket": exit_ticket(p, p.get("signal"), prefs)})
+            p_orders = idx.get(f"cycle:{p['cycle_id']}", []) if ex_state["account"] == "real" else []
+            exits.append({**p, "exit_ticket": exit_ticket(p, p.get("signal"), prefs), "open_orders": p_orders})
 
     return jsonify({
         "new_signals": new_signals,
@@ -93,4 +113,5 @@ def today():
         "recent_alerts": alerts.list_alerts(limit=8),
         "market": market_status(),
         "fresh_hours": fresh_hours,
+        "execution": {k: ex_state[k] for k in ("mode", "account", "armed", "can_send", "reason", "order_type")},
     })

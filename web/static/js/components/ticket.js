@@ -4,6 +4,13 @@ import * as f from '../format.js';
 import { emit } from '../state.js';
 import { avatar, copyText, copyableBadge, debounce, esc, icon, noteList, showMenu, closeMenus, toast, toastError } from '../ui.js';
 import { openExecutionForm } from './exec_form.js';
+import { executionMode, openOrderModal, orderLine, orderStatusLabel, sendLabel } from './order_modal.js';
+
+function openOrdersHtml(list) {
+  if (!list || !list.length) return '';
+  return `<div class="ticket-orders">${list.map((o) => `<div class="row-between"><span>${icon('clock')} ${orderLine(o)} ${orderStatusLabel(o)}</span>
+    <button class="btn btn-sm btn-ghost" data-action="cancel-order" data-order="${o.id}">Cancelar</button></div>`).join('')}</div>`;
+}
 
 const registry = new Map(); // signal_id -> {sig, ticket}
 
@@ -74,8 +81,10 @@ export function ticketCard(sig, { kind = 'new', isNew = false, compact = false }
     </div>
     <div class="ticket-totals" data-slot="totals">${totalsHtml(t)}</div>
     <div data-slot="warnings">${noteList(t.warnings)}</div>
+    ${openOrdersHtml(sig.open_orders)}
     <div class="ticket-actions">
-      <button class="btn btn-primary" data-action="executed" ${t.can_execute ? '' : 'disabled'}>${icon('check')} Executei</button>
+      ${executionMode().mode !== 'off' && !(sig.open_orders && sig.open_orders.length) ? `<button class="btn btn-primary" data-action="send" ${t.can_execute ? '' : 'disabled'} title="Envia a ordem com confirmação">${icon('zap')} ${sendLabel()}</button>` : ''}
+      <button class="btn ${executionMode().mode !== 'off' ? '' : 'btn-primary'}" data-action="executed" ${t.can_execute ? '' : 'disabled'} title="Registrar o que você executou no Home Broker">${icon('check')} Executei</button>
       <button class="btn" data-action="copy" title="Copia o texto da ordem para colar no Home Broker">${icon('copy')} Copiar boleta</button>
       ${compact ? '' : `
       <div class="menu-wrap"><button class="btn btn-ghost" data-action="snooze" data-menu title="Lembrar depois">${icon('snooze')}<span class="hide-sm">Depois</span></button></div>
@@ -116,12 +125,24 @@ export function exitCard(p) {
       <div class="price-stat"><div class="lbl">Agora</div><div class="val">${p.last_price === null ? '—' : f.brl(p.last_price)}</div><div class="sub muted">${p.last_price === null ? 'sem cotação' : ''}</div></div>
       <div class="price-stat"><div class="lbl">Seu P&L ≈</div><div class="val ${f.tone(pnl)}">${f.brl(pnl, { sign: true })}</div><div class="sub ${f.tone(pnlPct)}" title="${esc(pnlNote)}">${f.pct(pnlPct)}</div></div>
     </div>
+    ${openOrdersHtml(p.open_orders)}
     <div class="ticket-actions">
-      <button class="btn btn-warn" data-action="register-exit">${icon('exit')} Registrar saída</button>
+      ${executionMode().mode === 'live' && !(p.open_orders && p.open_orders.length) ? `<button class="btn btn-warn" data-action="send-exit">${icon('zap')} Enviar saída ao MT5</button>` : ''}
+      <button class="btn ${executionMode().mode === 'live' ? '' : 'btn-warn'}" data-action="register-exit">${icon('exit')} Registrar saída</button>
       <button class="btn" data-action="copy-exit">${icon('copy')} Copiar boleta</button>
       <button class="btn btn-ghost" data-action="keep" title="Não vou seguir a saída do analista agora">Manter</button>
     </div>
   </article>`;
+}
+
+export function openExitOrder(pos) {
+  const t = pos.exit_ticket || {};
+  return openOrderModal({
+    ticker: pos.ticker, side: t.side || (pos.side === 'LONG' ? 'SELL' : 'BUY'), quantity: pos.quantity,
+    limit_price: t.reference_price || pos.last_price, order_type: 'limit', purpose: 'exit',
+    cycle_id: pos.cycle_id, signal_id: pos.signal ? pos.signal.id : null,
+    context: pos.signal && pos.signal.preco_saida ? `${pos.signal.trader} saiu a ${f.brl(pos.signal.preco_saida)}` : 'Zerar posição',
+  });
 }
 
 // ---------- Interações (delegação de eventos)
@@ -160,12 +181,28 @@ export function bindTickets(root, { getPositions = () => [] } = {}) {
     const card = btn.closest('.ticket');
     if (!card) return;
     const action = btn.dataset.action;
+    if (action === 'cancel-order') {
+      try {
+        await post(`/api/orders/${btn.dataset.order}/cancel`, {});
+        toast('Ordem cancelada', 'info');
+        emit('data-changed');
+      } catch (err) { toastError(err); }
+      return;
+    }
 
     if (card.dataset.sid) {
       const entry = registry.get(card.dataset.sid);
       if (!entry) return;
       const { sig } = entry;
       if (action === 'copy') return copyText(entry.ticket.copy_text, 'Boleta copiada — cole no Home Broker');
+      if (action === 'send') {
+        const t = entry.ticket;
+        return openOrderModal({
+          ticker: sig.ticker, side: sig.lado, quantity: t.quantity, limit_price: t.limit_price,
+          order_type: executionMode().order_type || 'limit', purpose: 'entry', signal_id: sig.id,
+          context: `Sinal de ${sig.trader}: entrada ${f.brl(t.entry_price)}${t.current_price != null ? ` · agora ${f.brl(t.current_price)}` : ''}`,
+        });
+      }
       if (action === 'executed') {
         return openExecutionForm({ mode: 'entry', signal: sig, ticket: entry.ticket, onSaved: () => emit('data-changed') });
       }
@@ -203,6 +240,7 @@ export function bindTickets(root, { getPositions = () => [] } = {}) {
       const pos = getPositions().find((p) => p.cycle_id === card.dataset.cycle);
       if (!pos) return;
       if (action === 'copy-exit') return copyText(pos.exit_ticket.copy_text, 'Boleta de saída copiada');
+      if (action === 'send-exit') return openExitOrder(pos);
       if (action === 'register-exit') return openExecutionForm({ mode: 'exit', position: pos, signal: pos.signal, onSaved: () => emit('data-changed') });
       if (action === 'keep') {
         try {

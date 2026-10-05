@@ -32,7 +32,8 @@ def estimate_fees(asset_class: str, gross_value: float, prefs: Optional[Dict[str
 # ---------------------------------------------------------------------------
 
 class _TickerBook:
-    def __init__(self, ticker: str, asset_class: str):
+    def __init__(self, ticker: str, asset_class: str, prefix: str = ""):
+        self.prefix = prefix
         self.ticker = ticker
         self.asset_class = asset_class
         self.qty = 0.0          # >0 comprado, <0 vendido
@@ -45,7 +46,7 @@ class _TickerBook:
     def _ensure_cycle(self, when: str, direction: str) -> Dict[str, Any]:
         if self.cycle is None:
             self.cycle = {
-                "id": f"{self.ticker}#{len(self.cycles) + 1}",
+                "id": f"{self.prefix}{self.ticker}#{len(self.cycles) + 1}",
                 "ticker": self.ticker,
                 "asset_class": self.asset_class,
                 "direction": direction,
@@ -146,7 +147,7 @@ def _exec_day(e: Dict[str, Any]) -> str:
     return dt.date().isoformat() if dt else str(e["executed_at"])[:10]
 
 
-def compute_ledger(executions: List[Dict[str, Any]]) -> Dict[str, Any]:
+def compute_ledger(executions: List[Dict[str, Any]], prefix: str = "") -> Dict[str, Any]:
     """Processa execuções e devolve posições abertas, ciclos (operações) e eventos realizados."""
     by_ticker: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for e in executions:
@@ -160,7 +161,7 @@ def compute_ledger(executions: List[Dict[str, Any]]) -> Dict[str, Any]:
     books: List[_TickerBook] = []
     for ticker, rows in by_ticker.items():
         rows.sort(key=lambda r: (to_brt(r["executed_at"]) or r["executed_at"], r.get("id") or 0))
-        book = _TickerBook(ticker, rows[0].get("asset_class") or b3_tickers.asset_class(None, ticker))
+        book = _TickerBook(ticker, rows[0].get("asset_class") or b3_tickers.asset_class(None, ticker), prefix)
         days: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         for r in rows:
             days[_exec_day(r)].append(r)
@@ -209,9 +210,21 @@ def _finish_cycle(c: Dict[str, Any]) -> Dict[str, Any]:
 # CRUD de execuções
 # ---------------------------------------------------------------------------
 
-def list_executions(ticker: Optional[str] = None, signal_id: Optional[str] = None, conn=None) -> List[Dict[str, Any]]:
+ACCOUNTS = ("real", "paper")
+
+
+def _account(account: Optional[str]) -> str:
+    return account if account in ACCOUNTS else "real"
+
+
+def list_executions(ticker: Optional[str] = None, signal_id: Optional[str] = None, account: Optional[str] = "real",
+                    conn=None) -> List[Dict[str, Any]]:
+    """account=None lista as duas contas."""
     sql, params = "SELECT * FROM executions", []
     where = []
+    if account is not None:
+        where.append("account = ?")
+        params.append(_account(account))
     if ticker:
         where.append("ticker = ?")
         params.append(b3_tickers.clean_ticker(ticker))
@@ -283,29 +296,39 @@ def _parse_local(value: Any):
     return dt.astimezone(BRT)
 
 
-def _position_after(conn, ticker: str, extra: Optional[Dict[str, Any]] = None, exclude_id: Optional[int] = None) -> float:
-    rows = [dict(r) for r in conn.execute("SELECT * FROM executions WHERE ticker = ?", (ticker,)) if r["id"] != exclude_id]
+def _position_after(conn, ticker: str, extra: Optional[Dict[str, Any]] = None, exclude_id: Optional[int] = None,
+                    account: str = "real") -> float:
+    rows = [dict(r) for r in conn.execute("SELECT * FROM executions WHERE ticker = ? AND account = ?", (ticker, account))
+            if r["id"] != exclude_id]
     if extra:
         rows.append({**extra, "id": 10**12})
     ledger = compute_ledger(rows)
     return sum(p["qty"] for p in ledger["positions"])
 
 
-def add_execution(data: Dict[str, Any], allow_short: bool = False, conn=None) -> Dict[str, Any]:
+def add_execution(data: Dict[str, Any], allow_short: bool = False, account: str = "real", source: str = "manual",
+                  order_id: Optional[int] = None, note_id: Optional[int] = None, fees_source: str = "manual",
+                  conn=None) -> Dict[str, Any]:
+    """
+    account: 'real' | 'paper' · source: 'manual' (digitado), 'broker' (preenchimento MT5/simulação), 'note' (nota de corretagem)
+    fees_source: 'manual' | 'estimate' | 'note' — de onde vieram os custos
+    """
     clean = _clean_execution(data)
+    account = _account(account)
     with db.transaction(conn) as c:
         if clean["signal_id"] and not c.execute("SELECT 1 FROM signals WHERE id = ?", (clean["signal_id"],)).fetchone():
             raise ValueError("Sinal vinculado não existe.")
-        if clean["side"] == "SELL" and not allow_short and _position_after(c, clean["ticker"], clean) < -EPS:
+        if clean["side"] == "SELL" and not allow_short and _position_after(c, clean["ticker"], clean, account=account) < -EPS:
             raise ValueError("Essa venda deixa a posição vendida (a descoberto). Confira a quantidade ou marque 'venda a descoberto'.")
         cur = c.execute(
-            "INSERT INTO executions(signal_id, ticker, side, quantity, price, fees, executed_at, asset_class, note, created_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO executions(signal_id, ticker, side, quantity, price, fees, executed_at, asset_class, note, created_at, "
+            "account, source, order_id, note_id, fees_source) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (clean["signal_id"], clean["ticker"], clean["side"], clean["quantity"], clean["price"], clean["fees"],
-             clean["executed_at"], clean["asset_class"], clean["note"], now_iso()),
+             clean["executed_at"], clean["asset_class"], clean["note"], now_iso(), account, source, order_id, note_id, fees_source),
         )
         exec_id = cur.lastrowid
-        if clean["signal_id"] and clean["side"] == ("BUY" if _signal_side(c, clean["signal_id"]) == "BUY" else "SELL"):
+        # decisão "executado" só vale para a conta real
+        if account == "real" and clean["signal_id"] and clean["side"] == ("BUY" if _signal_side(c, clean["signal_id"]) == "BUY" else "SELL"):
             c.execute(
                 "INSERT INTO decisions(signal_id, status, decided_at) VALUES(?, 'executed', ?) "
                 "ON CONFLICT(signal_id) DO UPDATE SET status = 'executed', remind_at = NULL, decided_at = excluded.decided_at",
@@ -328,12 +351,16 @@ def update_execution(exec_id: int, data: Dict[str, Any], allow_short: bool = Fal
         if not allow_short:
             for ticker in {current["ticker"], clean["ticker"]}:
                 extra = clean if ticker == clean["ticker"] else None
-                if _position_after(c, ticker, extra, exclude_id=exec_id) < -EPS:
+                if _position_after(c, ticker, extra, exclude_id=exec_id, account=current["account"]) < -EPS:
                     raise ValueError("Com essa alteração a posição fica vendida (a descoberto). Confira as quantidades.")
+        fees_source = current["fees_source"]
+        if "fees" in data and round(float(data.get("fees") or 0), 2) != round(float(current["fees"] or 0), 2):
+            fees_source = data.get("fees_source") or "manual"
         c.execute(
-            "UPDATE executions SET signal_id=?, ticker=?, side=?, quantity=?, price=?, fees=?, executed_at=?, asset_class=?, note=? WHERE id=?",
+            "UPDATE executions SET signal_id=?, ticker=?, side=?, quantity=?, price=?, fees=?, executed_at=?, asset_class=?, note=?, "
+            "fees_source=? WHERE id=?",
             (clean["signal_id"], clean["ticker"], clean["side"], clean["quantity"], clean["price"], clean["fees"],
-             clean["executed_at"], clean["asset_class"], clean["note"], exec_id),
+             clean["executed_at"], clean["asset_class"], clean["note"], fees_source, exec_id),
         )
         return dict(c.execute("SELECT * FROM executions WHERE id = ?", (exec_id,)).fetchone())
 
@@ -344,9 +371,11 @@ def delete_execution(exec_id: int, conn=None) -> None:
         if not row:
             raise KeyError(exec_id)
         c.execute("DELETE FROM executions WHERE id = ?", (exec_id,))
-        if row["signal_id"] and not c.execute("SELECT 1 FROM executions WHERE signal_id = ?", (row["signal_id"],)).fetchone():
+        c.execute("UPDATE order_fills SET execution_id = NULL WHERE execution_id = ?", (exec_id,))
+        if row["signal_id"] and not c.execute("SELECT 1 FROM executions WHERE signal_id = ? AND account = 'real'", (row["signal_id"],)).fetchone():
             c.execute("DELETE FROM decisions WHERE signal_id = ? AND status = 'executed'", (row["signal_id"],))
 
 
-def ledger(conn=None) -> Dict[str, Any]:
-    return compute_ledger(list_executions(conn=conn))
+def ledger(conn=None, account: str = "real") -> Dict[str, Any]:
+    account = _account(account)
+    return compute_ledger(list_executions(account=account, conn=conn), prefix="" if account == "real" else "paper:")

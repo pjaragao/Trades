@@ -10,6 +10,14 @@ import { esc, icon, loading, modalOpen, toastError } from '../ui.js';
 
 const seen = new Set(); // sinais já exibidos nesta sessão (para animar só os novos)
 
+function execBanner(ex) {
+  if (!ex || ex.mode === 'off') return '';
+  if (!ex.can_send) return `<div class="banner warning">${icon('alert')}<div class="grow">Execução indisponível: ${esc(ex.reason)}</div><a class="btn btn-sm" href="#/configuracoes">Ver</a></div>`;
+  if (ex.mode === 'paper') return `<div class="banner info">${icon('info')}<div class="grow"><strong>Modo simulação.</strong> "Enviar" manda ordens para a conta simulada${ex.armed ? ' e a <strong>automação está armada</strong>' : ''}. Esta tela mostra sua conta real.</div><a class="btn btn-sm" href="#/carteira?conta=simulacao">Conta simulada</a></div>`;
+  if (ex.armed) return `<div class="banner danger">${icon('zap')}<div class="grow"><strong>Automação REAL armada.</strong> Entradas e saídas podem ser enviadas ao MT5 sem confirmação, dentro dos limites.</div><a class="btn btn-sm" href="#/configuracoes">Limites</a></div>`;
+  return '';
+}
+
 function tiles(s) {
   return `
   <div class="grid grid-4 section">
@@ -57,6 +65,7 @@ export default {
           </div>
         </div>
 
+        ${execBanner(data.execution)}
         ${tiles(data.summary)}
 
         <section class="section">

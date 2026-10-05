@@ -42,8 +42,13 @@ def _months_between(first: str, last: str) -> List[str]:
     return out
 
 
-def monthly_tax(events: List[Dict[str, Any]], until: Optional[str] = None) -> List[Dict[str, Any]]:
-    """events: saída de journal.compute_ledger()['events']."""
+def monthly_tax(events: List[Dict[str, Any]], until: Optional[str] = None,
+                irrf_actual: Optional[Dict[str, float]] = None) -> List[Dict[str, Any]]:
+    """
+    events: saída de journal.compute_ledger()['events'].
+    irrf_actual: IRRF de swing por mês lido das notas de corretagem (substitui a estimativa de 0,005%).
+    """
+    irrf_actual = irrf_actual or {}
     if not events:
         return []
     by_month: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
@@ -90,7 +95,8 @@ def monthly_tax(events: List[Dict[str, Any]], until: Optional[str] = None) -> Li
 
         swing_tax = swing_base * SWING_RATE
         day_tax = day_base * DAY_RATE
-        irrf = b.get("swing_sales", 0.0) * IRRF_SWING + max(day_pnl, 0.0) * IRRF_DAY
+        swing_irrf = irrf_actual[m] if m in irrf_actual else b.get("swing_sales", 0.0) * IRRF_SWING
+        irrf = swing_irrf + max(day_pnl, 0.0) * IRRF_DAY
         due = max(0.0, swing_tax + day_tax - irrf) + carry_tax
         pay = due if due >= DARF_MIN else 0.0
         carry_tax = 0.0 if pay else due
@@ -108,6 +114,7 @@ def monthly_tax(events: List[Dict[str, Any]], until: Optional[str] = None) -> Li
             "swing_tax": round(swing_tax, 2),
             "day_tax": round(day_tax, 2),
             "irrf_estimate": round(irrf, 2),
+            "irrf_source": "nota" if m in irrf_actual else "estimativa",
             "darf_value": round(pay, 2),
             "carried_to_next": round(carry_tax, 2),
             "swing_loss_carry": round(swing_loss, 2),

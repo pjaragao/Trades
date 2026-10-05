@@ -3,7 +3,45 @@ import { get, post, put } from '../api.js';
 import * as f from '../format.js';
 import { emit, state } from '../state.js';
 import { beep, permission, requestPermission } from '../notify.js';
-import { esc, icon, loading, toast, toastError } from '../ui.js';
+import { confirmDialog, esc, icon, loading, toast, toastError } from '../ui.js';
+
+function execCard(p, sys) {
+  const ex = p.execution;
+  const a = ex.auto;
+  const gate = sys.execution.enabled;
+  const num = (k, label, val, hint = '', dec = 0) => `<div class="field"><label>${label}</label><input class="input num" data-k="execution.auto.${k}" value="${dec ? f.num(val, dec) : val}">${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+  const sw = (k, label, on) => `<label class="switch"><input type="checkbox" data-k="execution.auto.${k}" ${on ? 'checked' : ''}><span class="track"></span>${label}</label>`;
+  return `
+  <section class="card span-all" id="exec-card">
+    <div class="card-head"><h2>${icon('zap')} Execução de ordens (MT5)</h2><span id="exec-health" class="hint"><span class="spinner"></span></span></div>
+    <div class="card-body stack">
+      <div class="field"><span class="label">Modo</span>
+        <div class="segmented" data-seg="execution.mode">
+          <button type="button" data-v="off">Desligado (só manual)</button>
+          <button type="button" data-v="paper">Simulação</button>
+          <button type="button" data-v="live" ${gate ? '' : 'disabled title="Ligue EXECUTION_ENABLED=true (Docker) ou execution.enabled no settings.yaml"'}>Real (MT5)</button>
+        </div>
+        <span class="hint">${gate ? 'Trava de execução real <strong>liberada</strong> no servidor.' : 'Execução real travada no servidor (EXECUTION_ENABLED / execution.enabled). Use Simulação para testar.'}
+          Conector: ${esc(sys.execution.broker === 'mt5_local' ? 'MT5 local (Windows)' : `agente MT5 ${sys.execution.mt5_agent_url || '(MT5_AGENT_URL não definido)'}`)}${sys.execution.broker !== 'mt5_local' ? (sys.execution.agent_token_set ? ' · token definido' : ' · <span class="loss">MT5_AGENT_TOKEN não definido</span>') : ''}.</span></div>
+      <div class="field"><span class="label">Tipo de ordem padrão</span>
+        <div class="segmented" data-seg="execution.order_type"><button type="button" data-v="limit">Limitada</button><button type="button" data-v="market">A mercado</button></div></div>
+      <div class="divider"></div>
+      <div class="row-between wrap"><div><h3>Automação</h3><p class="hint">Armada, ela envia sozinha as entradas de sinais novos e as saídas quando o analista encerra — dentro dos limites abaixo.</p></div>
+        <label class="switch"><input type="checkbox" data-k="execution.auto.armed" id="armed" ${a.armed ? 'checked' : ''}><span class="track"></span><strong>Armada</strong></label></div>
+      <div class="row wrap" style="gap:var(--s5)">${sw('entries', 'Entradas', a.entries)}${sw('exits', 'Saídas', a.exits)}${sw('only_copyable', 'Só analistas copiáveis', a.only_copyable)}</div>
+      <div class="form-grid form-grid-3">
+        ${num('max_orders_per_day', 'Entradas automáticas por dia', a.max_orders_per_day)}
+        ${num('max_daily_loss', 'Perda máxima no dia (R$)', a.max_daily_loss, 'Bloqueia novas entradas', 2)}
+        ${num('max_exposure_pct', 'Exposição máxima (% do capital)', a.max_exposure_pct, '', 0)}
+        ${num('max_trade_value', 'Valor máximo por ordem (R$)', a.max_trade_value, '', 2)}
+        ${num('max_signal_age_minutes', 'Idade máxima do sinal (min)', a.max_signal_age_minutes, 'Não entra em sinal antigo')}
+        ${num('cancel_after_minutes', 'Cancelar ordem não executada após (min)', a.cancel_after_minutes)}
+      </div>
+      <div class="row wrap"><button type="button" class="btn btn-danger" data-act="panic">${icon('alert')} Pânico: desarmar e cancelar ordens abertas</button>
+        <a class="btn btn-ghost btn-sm" href="#/carteira">Ver ordens e decisões</a></div>
+    </div>
+  </section>`;
+}
 
 export default {
   title: 'Configurações',
@@ -109,6 +147,8 @@ export default {
           </div>
         </section>
 
+        ${execCard(p, sys)}
+
         <section class="card">
           <div class="card-head"><h2>${icon('copy')} Corretora / boleta</h2></div>
           <div class="card-body form-grid">
@@ -123,7 +163,7 @@ export default {
             <dl class="kv">
               <dt>TradingFloors</dt><dd>${sys.tf_configured ? esc(sys.tf_email) : '<span class="loss">não configurado (config/.env)</span>'}</dd>
               <dt>Monitor de sinais</dt><dd>a cada ${sys.poll_seconds}s no pregão</dd>
-              <dt>Execução automática (MT5)</dt><dd>${sys.execution.enabled ? '<span class="warn-text">ligada</span>' : 'desligada · fase 6'}</dd>
+              <dt>Trava da execução real</dt><dd>${sys.execution.enabled ? '<span class="warn-text">liberada</span>' : 'travada (EXECUTION_ENABLED)'}</dd>
               <dt>Banco de dados</dt><dd style="word-break:break-all">${esc(sys.db_path)}</dd>
             </dl>
             <div class="row wrap mt-4">
@@ -150,6 +190,17 @@ export default {
     };
     syncSeg();
 
+    get('/api/execution').then((ex) => {
+      const h = ex.state.health;
+      const el = root.querySelector('#exec-health');
+      if (!el) return;
+      if (ex.state.mode === 'off') { el.innerHTML = '<span class="badge">desligado</span>'; return; }
+      if (!h) { el.textContent = ''; return; }
+      el.innerHTML = h.ok
+        ? `<span class="badge badge-ok badge-plain">${esc(ex.state.mode === 'paper' ? 'Simulação pronta' : `MT5 conectado · ${h.account?.login ?? ''} ${h.account?.company ?? ''}`)}</span>${ex.state.armed ? ' <span class="badge badge-warn">AUTOMAÇÃO ARMADA</span>' : ''}`
+        : `<span class="badge badge-bad badge-plain" title="${esc(h.message)}">${esc(h.message)}</span>`;
+    }).catch(() => {});
+
     form.addEventListener('click', async (e) => {
       const seg = e.target.closest('[data-seg] button');
       if (seg) { setPath(p, seg.parentElement.dataset.seg, seg.dataset.v); syncSeg(); return; }
@@ -163,6 +214,17 @@ export default {
       if (act.dataset.act === 'perm') { await requestPermission(); root.querySelector('#perm').innerHTML = notifState(); }
       if (act.dataset.act === 'tg') {
         try { await post('/api/alerts/test-telegram'); toast('Mensagem de teste enviada ao Telegram', 'success'); } catch (err) { toastError(err); }
+      }
+      if (act.dataset.act === 'panic') {
+        const ok = await confirmDialog({ title: 'Pânico', message: 'Desarmar a automação e cancelar todas as ordens abertas?', confirmText: 'Desarmar e cancelar', danger: true });
+        if (!ok) return;
+        try {
+          const r = await post('/api/execution/panic', {});
+          toast(`Automação desarmada. ${r.cancelled} ordem(ns) cancelada(s).`, 'warning');
+          form.querySelector('#armed').checked = false;
+          p.execution.auto.armed = false;
+          emit('data-changed');
+        } catch (err) { toastError(err); }
       }
       if (act.dataset.act === 'history') {
         act.disabled = true;
@@ -183,9 +245,20 @@ export default {
       });
       p.follow.traders = [...form.querySelectorAll('#pick-traders .pick.on')].map((b) => b.dataset.trader);
       p.follow.asset_classes = [...form.querySelectorAll('#pick-classes .pick.on')].map((b) => b.dataset.class);
+      if (p.execution.auto.armed && !data.prefs.execution.auto.armed) {
+        const live = p.execution.mode === 'live';
+        const ok = await confirmDialog({
+          title: live ? 'Armar automação REAL' : 'Armar automação (simulação)',
+          message: live ? 'A automação vai enviar ordens REAIS ao MetaTrader 5 sem pedir confirmação, dentro dos limites configurados. Continuar?'
+            : 'A automação vai enviar ordens na conta simulada sozinha. Continuar?',
+          confirmText: live ? 'Sim, armar com dinheiro real' : 'Armar simulação', danger: live,
+        });
+        if (!ok) return;
+      }
       try {
         const r = await put('/api/settings', p);
         state.prefs = r.prefs;
+        data.prefs = structuredClone(r.prefs);
         toast('Configurações salvas', 'success');
         emit('data-changed');
       } catch (err) { toastError(err); }

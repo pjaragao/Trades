@@ -247,3 +247,5 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 @media (max-width: 560px) { .hide-sm { display: none; } }
 @media (max-width: 1360px) { .hide-md { display: none; } }
 .table td.nowrap .cell-sub { white-space: nowrap; }
+.grid-2-1 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .grid-2-1 { grid-template-columns: 1fr; } }

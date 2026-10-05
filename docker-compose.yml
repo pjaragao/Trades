@@ -1,0 +1,23 @@
+# Copiloto de Trades no homelab
+#   cp .env.example .env   (preencha)
+#   docker compose up -d --build
+#   http://<ip-do-homelab>:5000
+services:
+  copiloto:
+    build:
+      context: .
+      args:
+        INSTALL_LAB: "false"   # "true" para previsão TimesFM (imagem ~1 GB maior)
+    image: copiloto-trades:latest
+    container_name: copiloto
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file: .env
+    environment:
+      TZ: America/Sao_Paulo
+    volumes:
+      # banco (app.db), chave de sessão e, opcionalmente, o cache antigo backtest_cache.db
+      - ./data:/data
+      # opcional: sobrescrever a configuração de infraestrutura
+      # - ./config/settings.yaml:/app/config/settings.yaml:ro
