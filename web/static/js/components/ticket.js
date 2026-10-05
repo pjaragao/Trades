@@ -1,7 +1,8 @@
 // Cartão "Boleta pronta" (novo sinal / lembrete) e cartão de "Saída pendente"
 import { get, post, qs } from '../api.js';
 import * as f from '../format.js';
-import { emit } from '../state.js';
+import { emit, on } from '../state.js';
+import { applyLive, quoteMetaHtml, quoteOf } from '../live.js';
 import { avatar, copyText, copyableBadge, debounce, esc, icon, noteList, showMenu, closeMenus, toast, toastError } from '../ui.js';
 import { openExecutionForm } from './exec_form.js';
 import { executionMode, openOrderModal, orderLine, orderStatusLabel, sendLabel } from './order_modal.js';
@@ -46,9 +47,16 @@ function totalsHtml(t) {
     <div><div class="t-lbl" title="${esc(t.max_loss_note || '')}">Perda máx.</div><div class="t-val ${t.max_loss ? 'loss' : 'muted'}">${t.max_loss ? f.brl(t.max_loss) : 'sem stop'}</div></div>`;
 }
 
+// Fonte do preço "agora": ao vivo (MT5/brapi) ou TradingFloors
+export function quoteLine(ticker, quote, { tfPrice = null, source = null, at = null } = {}) {
+  const fallbackSource = source || (tfPrice !== null && tfPrice !== undefined ? 'tradingfloors' : null);
+  return `<div class="ticket-quote" data-lmeta="${esc(ticker)}">${quoteMetaHtml(quote, { fallbackSource, fallbackAt: at })}</div>`;
+}
+
 export function ticketCard(sig, { kind = 'new', isNew = false, compact = false } = {}) {
   const t = sig.ticket;
   registry.set(sig.id, { sig, ticket: t });
+  const basis = sig.lado === 'SELL' ? 'bid' : 'ask';
   const sideCls = sig.lado === 'SELL' ? 'sell' : '';
   const kindLabel = { new: 'Novo sinal', reminder: 'Lembrete', detail: 'Boleta pronta' }[kind] || 'Sinal';
   const when = sig.timestamp_entrada ? `${f.ago(sig.timestamp_entrada)}` : '';
@@ -70,9 +78,10 @@ export function ticketCard(sig, { kind = 'new', isNew = false, compact = false }
     <div class="ticket-desc">${esc(optionDesc(sig))}</div>
     <div class="ticket-prices">
       <div class="price-stat"><div class="lbl">Entrada analista</div><div class="val">${f.brl(t.entry_price, { dec: 2 })}</div><div class="sub muted">${esc(f.dateTime(sig.timestamp_entrada))}</div></div>
-      <div class="price-stat"><div class="lbl">Agora</div><div class="val">${t.current_price === null ? '—' : f.brl(t.current_price)}</div><div class="sub ${driftTone(t)}" title="Diferença em relação à entrada do analista">${t.drift_pct === null ? 'sem cotação' : f.pct(t.drift_pct)}</div></div>
+      <div class="price-stat"><div class="lbl" title="Com MT5 ao vivo: melhor oferta de ${sig.lado === 'SELL' ? 'compra (o que você receberia)' : 'venda (o que você pagaria)'}">Agora</div><div class="val" data-lp="${esc(sig.ticker)}" data-basis="${basis}">${t.current_price === null ? '—' : f.brl(t.current_price)}</div><div class="sub ${driftTone(t)}" data-ldrift="${esc(sig.ticker)}" data-entry="${t.entry_price || ''}" data-side="${esc(sig.lado)}" data-basis="${basis}" title="Diferença em relação à entrada do analista">${t.drift_pct === null ? 'sem cotação' : f.pct(t.drift_pct)}</div></div>
       <div class="price-stat"><div class="lbl">Máx. aceitável</div><div class="val">${t.worst_price ? f.brl(t.worst_price) : '—'}</div><div class="sub muted">limite de slippage</div></div>
     </div>
+    ${quoteLine(sig.ticker, quoteOf(sig.ticker) || t.quote, { tfPrice: sig.preco_atual })}
     <div class="ticket-form">
       <div class="field"><label for="q-${esc(sig.id)}">Quantidade <span class="faint">(lote ${f.qty(t.lot)})</span></label>
         <input id="q-${esc(sig.id)}" class="input num" data-field="quantity" inputmode="numeric" value="${f.qty(t.quantity)}"></div>
@@ -100,6 +109,8 @@ export function exitCard(p) {
   let pnl = p.unrealized_pnl;
   let pnlPct = p.unrealized_pct;
   let pnlNote = p.last_price_at ? f.ago(p.last_price_at) : '';
+  const basis = p.side === 'LONG' ? 'bid' : 'ask';
+  const live = `data-qty="${p.quantity}" data-avg="${p.avg_price}" data-side="${p.side}" data-invested="${p.invested || ''}" data-basis="${basis}"`;
   if ((pnl === null || pnl === undefined) && s.preco_saida != null) {
     pnl = (p.side === 'LONG' ? s.preco_saida - p.avg_price : p.avg_price - s.preco_saida) * p.quantity;
     pnlPct = p.invested ? (pnl / p.invested) * 100 : null;
@@ -122,9 +133,10 @@ export function exitCard(p) {
     <div class="ticket-desc">Você tem ${f.qty(p.quantity)} un · preço médio ${f.brl(p.avg_price, { dec: 2 })}</div>
     <div class="ticket-prices">
       <div class="price-stat"><div class="lbl">Saída analista</div><div class="val">${f.brl(s.preco_saida)}</div><div class="sub ${f.tone(ret)}">${ret === null || ret === undefined ? '—' : f.pct(ret)} no sinal</div></div>
-      <div class="price-stat"><div class="lbl">Agora</div><div class="val">${p.last_price === null ? '—' : f.brl(p.last_price)}</div><div class="sub muted">${p.last_price === null ? 'sem cotação' : ''}</div></div>
-      <div class="price-stat"><div class="lbl">Seu P&L ≈</div><div class="val ${f.tone(pnl)}">${f.brl(pnl, { sign: true })}</div><div class="sub ${f.tone(pnlPct)}" title="${esc(pnlNote)}">${f.pct(pnlPct)}</div></div>
+      <div class="price-stat"><div class="lbl" title="Com MT5 ao vivo: melhor oferta de ${p.side === 'LONG' ? 'compra (o que você receberia vendendo)' : 'venda (o que você pagaria comprando)'}">Agora</div><div class="val" data-lp="${esc(p.ticker)}" data-basis="${basis}">${p.last_price === null ? '—' : f.brl(p.last_price)}</div><div class="sub muted">${p.last_price === null ? 'sem cotação' : ''}</div></div>
+      <div class="price-stat"><div class="lbl">Seu P&L ≈</div><div class="val ${f.tone(pnl)}" data-lpnl="${esc(p.ticker)}" ${live}>${f.brl(pnl, { sign: true })}</div><div class="sub ${f.tone(pnlPct)}" data-lpnl="${esc(p.ticker)}" data-fmt="pct" ${live} title="${esc(pnlNote)}">${f.pct(pnlPct)}</div></div>
     </div>
+    ${quoteLine(p.ticker, quoteOf(p.ticker), { source: p.last_price_source, at: p.last_price_at })}
     ${openOrdersHtml(p.open_orders)}
     <div class="ticket-actions">
       ${executionMode().mode === 'live' && !(p.open_orders && p.open_orders.length) ? `<button class="btn btn-warn" data-action="send-exit">${icon('zap')} Enviar saída ao MT5</button>` : ''}
@@ -165,8 +177,30 @@ async function refreshTicket(card) {
   } catch (e) { /* mantém valores anteriores */ }
 }
 const refreshDebounced = new Map();
+const LIVE_REFRESH_MS = 4000;
+
+// Cotação mudou: atualiza avisos/totais da boleta (sem mexer no que o usuário digitou)
+function watchQuotes(root) {
+  const last = new WeakMap();
+  const off = on('quotes', (d) => {
+    if (!root.isConnected) { off(); return; }
+    const changed = new Set(Object.keys(d.quotes || {}));
+    if (!changed.size) return;
+    root.querySelectorAll('.ticket[data-sid]').forEach((card) => {
+      const entry = registry.get(card.dataset.sid);
+      if (!entry || !changed.has(entry.sig.ticker)) return;
+      if (card.contains(document.activeElement) && document.activeElement.matches('input')) return;
+      const now = Date.now();
+      if (now - (last.get(card) || 0) < LIVE_REFRESH_MS) return;
+      last.set(card, now);
+      refreshTicket(card);
+    });
+  });
+  applyLive(root);
+}
 
 export function bindTickets(root, { getPositions = () => [] } = {}) {
+  watchQuotes(root);
   root.addEventListener('input', (e) => {
     const input = e.target.closest('.ticket [data-field]');
     if (!input) return;

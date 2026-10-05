@@ -3,7 +3,7 @@
 # ficam na tela Configurações do app (gravadas em database/app.db).
 app:
   name: Copiloto de Trades
-  version: 2.1.0
+  version: 2.2.0
 
 trading_floors:
   supabase_url: https://ayvqtffpfmfescxzqifp.supabase.co
@@ -24,6 +24,12 @@ monitor:
 #   open: "10:00"
 #   close: "16:55"
 #   closing_call_end: "17:00"
+
+# market_data:          # cotações (as variáveis de ambiente QUOTES_* / BRAPI_* têm prioridade)
+#   provider: auto       # auto | mt5 | brapi | off
+#   interval_seconds: 2  # MT5 no pregão
+#   brapi_daily_budget: 450   # plano gratuito: 15.000 req em 30 dias
+#   brapi_min_interval_seconds: 1800
 
 execution:
   # Fase manual: execução automática no MT5 DESLIGADA. Só ligue na Fase 6.

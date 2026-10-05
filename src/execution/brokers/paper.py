@@ -1,5 +1,5 @@
 """
-Conta simulada (paper trading): preenche ordens pelas cotações conhecidas (TradingFloors/MT5/manual).
+Conta simulada (paper trading): preenche ordens pelas cotações conhecidas (MT5 ao vivo/TradingFloors/manual).
 
 - Limite de compra é preenchido quando a cotação está <= limite (no menor dos dois preços);
   limite de venda quando a cotação está >= limite. Sem cotação conhecida, preenche no limite.
@@ -22,14 +22,16 @@ class PaperBroker(Broker):
 
     def quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         with db.connection() as c:
-            row = c.execute("SELECT price, updated_at FROM quotes WHERE ticker = ?", (symbol,)).fetchone()
+            row = c.execute("SELECT price, bid, ask, last, updated_at FROM quotes WHERE ticker = ?", (symbol,)).fetchone()
         if not row:
             return None
-        return {"bid": row["price"], "ask": row["price"], "last": row["price"], "time": row["updated_at"]}
+        return {"bid": row["bid"] or row["price"], "ask": row["ask"] or row["price"], "last": row["last"] or row["price"],
+                "time": row["updated_at"]}
 
     def _try_fill(self, side: str, quantity: float, order_type: str, limit_price: Optional[float], symbol: str):
         q = self.quote(symbol)
-        px = q["last"] if q else None
+        # com book (MT5): compra executa contra a oferta de venda, venda contra a de compra
+        px = (q["ask"] if side == "BUY" else q["bid"]) if q else None
         if order_type == "market":
             return px
         if px is None:

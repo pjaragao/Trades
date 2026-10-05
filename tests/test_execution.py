@@ -159,6 +159,7 @@ class FakeMT5:
     def last_error(self): return (0, "ok")
     def symbol_select(self, s, on): return s != "INEXISTENTE"
     def symbol_info_tick(self, s): return SimpleNamespace(bid=0.39, ask=0.41, last=0.40, time=1790000000)
+    def symbol_info(self, s): return SimpleNamespace(price_change=0.0)
 
     def order_send(self, req):
         self.sent.append(req)

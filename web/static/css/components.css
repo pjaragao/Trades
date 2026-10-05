@@ -249,3 +249,16 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .table td.nowrap .cell-sub { white-space: nowrap; }
 .grid-2-1 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 @media (max-width: 1100px) { .grid-2-1 { grid-template-columns: 1fr; } }
+
+/* Cotações ao vivo */
+.qmeta { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-xs); color: var(--text-muted); }
+.qbook { font-variant-numeric: tabular-nums; color: var(--text); }
+.qdot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.qdot.live { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); animation: pulse 2s infinite; }
+.qdot.warn { background: var(--warn); }
+.flash-up { animation: flash-up 1.2s ease-out; }
+.flash-down { animation: flash-down 1.2s ease-out; }
+@keyframes flash-up { from { background: var(--accent-soft); } to { background: transparent; } }
+@keyframes flash-down { from { background: var(--danger-soft); } to { background: transparent; } }
+.ticket-quote { margin-top: calc(var(--s2) * -1); }
+@media (prefers-reduced-motion: reduce) { .flash-up, .flash-down, .qdot.live { animation: none; } }

@@ -2,6 +2,7 @@
 import { post } from '../api.js';
 import * as f from '../format.js';
 import { emit, state } from '../state.js';
+import { applyLive, quoteMetaHtml, quoteOf, watch } from '../live.js';
 import { esc, icon, loading, noteList, openModal, toast } from '../ui.js';
 
 export function executionMode() {
@@ -19,6 +20,7 @@ export function sendLabel() {
 export async function openOrderModal(order) {
   const m = openModal({ title: order.purpose === 'exit' ? 'Enviar ordem de saída' : 'Enviar ordem', body: loading('Conferindo conexão e riscos…') });
   let check;
+  watch([order.ticker]);
   try {
     check = await post('/api/orders/check', order);
   } catch (e) {
@@ -46,10 +48,13 @@ export async function openOrderModal(order) {
     <div class="copy-box" style="font-size:1rem">${side} ${f.qty(order.quantity)} ${esc(order.ticker)}
 ${order.order_type === 'market' ? 'A MERCADO' : `LIMITE ${f.brl(order.limit_price)}`} · validade: dia
 Total ≈ ${f.brl(total)}</div>
+    <div class="row-between mt-3"><span class="muted">Agora: <strong data-lp="${esc(order.ticker)}" data-basis="${order.side === 'BUY' ? 'ask' : 'bid'}">—</strong></span>
+      <span data-lmeta="${esc(order.ticker)}">${quoteMetaHtml(quoteOf(order.ticker))}</span></div>
     ${order.context ? `<p class="muted mt-3">${esc(order.context)}</p>` : ''}
     <div class="mt-4">${noteList(notes)}</div>
     ${health.message && !health.ok ? '' : (live && health.ok ? `<p class="hint mt-3">Conector: ${esc(health.message)}${acct && acct.balance != null ? ` · saldo ${f.brl(acct.balance)}` : ''}</p>` : '')}
   `);
+  applyLive(m.el);
   const canConfirm = st.can_send && risk.ok;
   const foot = document.createElement('div');
   foot.className = 'modal-foot';

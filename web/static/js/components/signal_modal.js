@@ -4,6 +4,7 @@ import * as f from '../format.js';
 import { emit } from '../state.js';
 import { esc, icon, loading, openModal, toastError, copyableBadge } from '../ui.js';
 import { bindTickets, optionDesc, ticketCard } from './ticket.js';
+import { quoteMetaHtml, quoteOf, watch } from '../live.js';
 import { openExecutionForm } from './exec_form.js';
 
 const DECISION_LABEL = { executed: ['badge-ok', 'Executado'], ignored: ['', 'Ignorado'], snoozed: ['badge-info', 'Adiado'] };
@@ -44,8 +45,9 @@ export async function openSignalModal(id) {
           <dl class="kv mt-3">
             <dt>Status</dt><dd>${sig.status === 'OPEN' ? 'Aberto' : 'Encerrado'}</dd>
             <dt>Entrada</dt><dd>${f.brl(sig.preco_entrada)} · ${esc(f.dateTime(sig.timestamp_entrada))}</dd>
-            ${sig.status === 'OPEN' ? `<dt>Preço atual (TF)</dt><dd>${f.brl(sig.preco_atual)}</dd>` : `<dt>Saída</dt><dd>${f.brl(sig.preco_saida)} · ${esc(f.dateTime(sig.timestamp_saida))}</dd>`}
-            <dt>Retorno do sinal</dt><dd class="${f.tone(ret)}">${f.pct(ret)}</dd>
+            ${sig.status === 'OPEN' ? `<dt>Preço atual</dt><dd><span data-lp="${esc(sig.ticker)}">${f.brl(sig.preco_atual)}</span>
+              <div data-lmeta="${esc(sig.ticker)}">${quoteMetaHtml(quoteOf(sig.ticker) || sig.quote, { fallbackSource: sig.preco_atual != null ? 'tradingfloors' : null })}</div></dd>` : `<dt>Saída</dt><dd>${f.brl(sig.preco_saida)} · ${esc(f.dateTime(sig.timestamp_saida))}</dd>`}
+            <dt>Retorno do sinal</dt><dd><span class="${f.tone(ret)}" ${sig.status === 'OPEN' ? `data-lret="${esc(sig.ticker)}" data-entry="${sig.preco_entrada || ''}" data-side="${esc(sig.lado)}"` : ''}>${f.pct(ret)}</span></dd>
             <dt>Stop / Alvo</dt><dd>${sig.stop_loss ? f.brl(sig.stop_loss) : '—'} / ${sig.take_profit ? f.brl(sig.take_profit) : '—'}</dd>
             <dt>Qtd. do analista</dt><dd>${f.qty(sig.quantidade)}</dd>
             <dt>Produto</dt><dd>${esc(sig.produto || '—')}</dd>
@@ -75,6 +77,7 @@ export async function openSignalModal(id) {
     </div>`);
 
   bindTickets(m.el);
+  if (sig.status === 'OPEN') watch([sig.ticker]); // sinal de analista não seguido: passa a ser acompanhado
   m.el.addEventListener('click', async (e) => {
     if (e.target.closest('[data-action=executed], [data-action=send]')) m.close();
     if (e.target.closest('.menu [data-reason], .menu [data-min]')) setTimeout(m.close, 50);

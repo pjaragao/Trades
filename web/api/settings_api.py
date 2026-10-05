@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 
 from src.core import db
 from src.core.b3_tickers import ASSET_CLASS_LABELS
-from src.core.config import execution_flags, get_prefs, monitor_poll_seconds, tf_settings, update_prefs
+from src.core.config import execution_flags, get_prefs, market_data_flags, monitor_poll_seconds, tf_settings, update_prefs
 from src.services import alerts, performance
 from src.services.signal_monitor import get_monitor
 
@@ -21,6 +21,8 @@ def _system():
         "poll_seconds": monitor_poll_seconds(),
         "execution": {**{k: v for k, v in execution_flags().items() if k != "mt5_agent_token"},
                       "agent_token_set": bool(execution_flags()["mt5_agent_token"])},
+        "market_data": {**{k: v for k, v in market_data_flags().items() if k != "brapi_token"},
+                        "brapi_token_set": bool(market_data_flags()["brapi_token"])},
         "db_path": str(db.db_path()),
         "asset_classes": ASSET_CLASS_LABELS,
         "traders": traders,

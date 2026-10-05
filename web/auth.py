@@ -59,10 +59,12 @@ def init_auth(app: Flask) -> None:
         PERMANENT_SESSION_LIFETIME=timedelta(days=30),
         AUTH_ENABLED=bool(password),
     )
-    if os.getenv("TRUST_PROXY", "").lower() in ("1", "true", "yes"):
+    trust = os.getenv("TRUST_PROXY", "").strip().lower()
+    hops = int(trust) if trust.isdigit() else (1 if trust in ("true", "yes") else 0)
+    if hops:  # nº de proxies na frente (ex.: 2 = nginx -> Traefik do Coolify -> app)
         from werkzeug.middleware.proxy_fix import ProxyFix
 
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
     if not password:
         log.warning("COPILOTO_PASSWORD não definido: acesso sem login (use só em 127.0.0.1).")
         return

@@ -6,9 +6,17 @@ import { openExecutionForm } from '../components/exec_form.js';
 import { openSignalModal } from '../components/signal_modal.js';
 import { openExitOrder } from '../components/ticket.js';
 import { orderLine, orderStatusLabel } from '../components/order_modal.js';
+import { applyLive, livePnlAttrs, quoteMetaHtml, quoteOf, watch } from '../live.js';
 import { confirmDialog, copyText, esc, icon, loading, noteList, openModal, toast, toastError } from '../ui.js';
 
 let account = 'real'; // conta exibida nesta tela
+
+function quoteSourceLabel() {
+  const fd = state.quotesFeed || state.status?.quotes;
+  if (fd && fd.state === 'live') return `cotações ao vivo (${fd.label})`;
+  if (fd && fd.state === 'delayed') return 'ações: brapi (~30 min) · opções: TradingFloors';
+  return 'cotações do TradingFloors / manual';
+}
 
 function canSendExit(p) {
   const mode = state.status?.execution?.mode || 'off';
@@ -35,10 +43,10 @@ function posCard(p) {
     <div><div class="lbl">Meu médio</div><div class="val">${f.brl(p.avg_price)}</div>
       <div class="val-sub ${slip === null || slip === undefined ? 'faint' : slip > 0.05 ? 'loss' : slip < -0.05 ? 'gain' : 'faint'}" title="Diferença do meu preço de entrada para o do analista (positivo = paguei mais caro)">${p.signal_entry ? `analista ${f.brl(p.signal_entry)} (${f.pct(slip)})` : '—'}</div></div>
     <div><div class="lbl">Atual</div>
-      <div class="val"><button class="link-btn" data-quote="${esc(p.ticker)}" title="Informar cotação manualmente">${p.last_price === null ? 'informar' : f.brl(p.last_price)}</button></div>
-      <div class="val-sub faint">${p.last_price_source === 'manual' ? 'manual · ' : p.last_price_source === 'mt5' ? 'MT5 · ' : ''}${p.last_price_at ? esc(f.ago(p.last_price_at)) : ''}</div></div>
-    <div><div class="lbl">Meu P&L / sinal</div><div class="val ${f.tone(p.unrealized_pnl)}">${f.brl(p.unrealized_pnl, { sign: true })}</div>
-      <div class="val-sub"><span class="${f.tone(p.unrealized_pct)}">${f.pct(p.unrealized_pct)}</span> <span class="faint">vs</span> <span class="${f.tone(p.signal_return_pct)}">${f.pct(p.signal_return_pct)}</span></div></div>
+      <div class="val"><button class="link-btn" data-quote="${esc(p.ticker)}" data-lp="${esc(p.ticker)}" title="Informar cotação manualmente">${p.last_price === null ? 'informar' : f.brl(p.last_price)}</button></div>
+      <div class="val-sub" data-lmeta="${esc(p.ticker)}">${quoteMetaHtml(quoteOf(p.ticker), { fallbackSource: p.last_price_source, fallbackAt: p.last_price_at })}</div></div>
+    <div><div class="lbl">Meu P&L / sinal</div><div class="val ${f.tone(p.unrealized_pnl)}" ${livePnlAttrs(p)} data-lsum-src data-v="${p.unrealized_pnl ?? ''}" data-mv="${p.market_value ?? ''}">${f.brl(p.unrealized_pnl, { sign: true })}</div>
+      <div class="val-sub"><span class="${f.tone(p.unrealized_pct)}" ${livePnlAttrs(p)} data-fmt="pct">${f.pct(p.unrealized_pct)}</span> <span class="faint">vs</span> <span class="${f.tone(p.signal_return_pct)}" ${p.signal && p.signal.status === 'OPEN' ? `data-lret="${esc(p.ticker)}" data-entry="${p.signal.preco_entrada || ''}" data-side="${esc(p.signal.lado)}"` : ''}>${f.pct(p.signal_return_pct)}</span></div></div>
     <div class="pos-actions">
       ${canSendExit(p) && !orders.length ? `<button class="btn btn-sm ${p.exit_pending ? 'btn-warn' : ''}" data-act="send-exit">${icon('zap')} ${p.account === 'paper' ? 'Sair (simulação)' : 'Enviar saída'}</button>` : ''}
       ${p.account === 'real' ? `<button class="btn btn-sm ${p.exit_pending && !canSendExit(p) ? 'btn-warn' : ''}" data-act="exit">${icon('exit')} Registrar saída</button>` : ''}
@@ -114,8 +122,8 @@ export default {
           </div></div>
         <div class="grid grid-4 section">
           <div class="card tile"><div class="tile-label">Investido</div><div class="tile-value">${f.brl(s.invested)}</div><div class="tile-sub">${s.open_positions} posição(ões)</div></div>
-          <div class="card tile"><div class="tile-label">Valor de mercado</div><div class="tile-value">${f.brl(mv)}</div><div class="tile-sub">${s.unpriced_positions ? `${s.unpriced_positions} sem cotação` : 'cotações TradingFloors/MT5'}</div></div>
-          <div class="card tile"><div class="tile-label">P&L em aberto</div><div class="tile-value ${f.tone(s.unrealized_pnl)}">${f.brl(s.unrealized_pnl, { sign: true })}</div><div class="tile-sub">sem custos de saída</div></div>
+          <div class="card tile"><div class="tile-label">Valor de mercado</div><div class="tile-value" data-lsum="mv">${f.brl(mv)}</div><div class="tile-sub">${s.unpriced_positions ? `${s.unpriced_positions} sem cotação` : quoteSourceLabel()}</div></div>
+          <div class="card tile"><div class="tile-label">P&L em aberto</div><div class="tile-value ${f.tone(s.unrealized_pnl)}" data-lsum="pnl">${f.brl(s.unrealized_pnl, { sign: true })}</div><div class="tile-sub">sem custos de saída</div></div>
           <div class="card tile"><div class="tile-label">Capital livre</div><div class="tile-value">${f.brl(s.free)}</div><div class="tile-sub">de ${f.brl(s.capital)}</div></div>
         </div>
         <section class="section">
@@ -129,6 +137,7 @@ export default {
             <a class="btn btn-sm btn-ghost" href="/api/export/execucoes.csv?account=${account}">${icon('download')} CSV</a></div></div>
           <div class="card">${execTable(execs.slice().reverse())}</div>
         </section>`;
+      applyLive(root);
     };
 
     const load = async () => {
@@ -138,6 +147,7 @@ export default {
           get('/api/execution?health=0').catch(() => ({ orders: [], automation_log: [] })),
         ]);
         render();
+        watch(data.positions.map((p) => p.ticker).filter((t) => !quoteOf(t)));
       } catch (e) {
         root.innerHTML = `<div class="banner danger">${icon('alert')}<div class="grow">${esc(e.message)}</div></div>`;
       }
@@ -174,7 +184,7 @@ export default {
         const m = openModal({
           title: `Cotação de ${ticker}`,
           body: `<div class="field"><label for="qv">Último preço (R$)</label><input id="qv" class="input num" inputmode="decimal" autofocus></div>
-                 <p class="hint mt-3">Use quando o TradingFloors/MT5 não informar o preço atual. Será substituído pela próxima cotação automática.</p>`,
+                 <p class="hint mt-3">Use quando não houver cotação automática. Com o MT5 ao vivo, a próxima cotação substitui este valor; o preço do TradingFloors só volta a valer depois de 30 min.</p>`,
           foot: '<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="qv-save">Salvar</button>',
         });
         m.el.querySelector('.modal-foot [data-close]').onclick = m.close;

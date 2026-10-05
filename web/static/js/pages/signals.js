@@ -9,11 +9,13 @@ const PAGE = 50;
 
 function retCell(s) {
   const v = s.status === 'CLOSED' ? s.return_final_pct : s.return_now_pct;
-  return `<span class="${f.tone(v)}">${f.pct(v)}</span>`;
+  const live = s.status === 'OPEN' ? ` data-lret="${esc(s.ticker)}" data-entry="${s.preco_entrada || ''}" data-side="${esc(s.lado)}"` : '';
+  return `<span class="${f.tone(v)}"${live}>${f.pct(v)}</span>`;
 }
 
 function priceNow(s) {
-  return s.status === 'CLOSED' ? f.brl(s.preco_saida) : (s.preco_atual === null ? '—' : f.brl(s.preco_atual));
+  if (s.status === 'CLOSED') return f.brl(s.preco_saida);
+  return `<span data-lp="${esc(s.ticker)}">${s.preco_atual === null ? '—' : f.brl(s.preco_atual)}</span>`;
 }
 
 function rows(items) {

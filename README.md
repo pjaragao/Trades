@@ -9,17 +9,39 @@ importa as notas de corretagem e mostra se você está ganhando dinheiro de verd
 ### Docker (homelab)
 
 ```bash
-cp .env.example .env        # preencha COPILOTO_PASSWORD, TF_EMAIL, TF_PASSWORD
+cp .env.example .env        # preencha COPILOTO_PASSWORD, TF_EMAIL, TF_PASSWORD (e BRAPI_TOKEN)
 docker compose up -d --build
 ```
 
 Acesse `http://<ip-do-homelab>:5000`. Os dados ficam em `./data` (banco `app.db` e a chave de sessão).
 Para trazer o histórico antigo de opções, copie `database/backtest_cache.db` para `./data/` antes do primeiro start.
 
-- Login: defina `COPILOTO_PASSWORD` (obrigatório se o app ficar acessível na rede). Atrás de proxy reverso com HTTPS,
-  use `TRUST_PROXY=true` e `COOKIE_SECURE=true`.
-- Previsão TimesFM no container: `INSTALL_LAB: "true"` no `docker-compose.yml` (imagem ~1 GB maior).
-- Um único worker do gunicorn: o monitor de sinais é uma thread do processo.
+- Login: `COPILOTO_PASSWORD` é obrigatório. Atrás de proxy reverso com HTTPS, use `COOKIE_SECURE=true` e
+  `TRUST_PROXY=<nº de proxies>` (1 = só o Coolify/Traefik; 2 = nginx na frente do Coolify).
+- Previsão TimesFM no container: `INSTALL_LAB=true` (imagem ~1 GB maior).
+- Um único worker do gunicorn: o monitor de sinais e o feed de cotações são threads do processo.
+- O container começa como root só para ajustar o dono de `/data` e roda o app como usuário `copiloto` (uid 1000).
+
+### Coolify (WSL + nginx)
+
+1. Coolify › novo recurso › **Docker Compose** apontando para este repositório (branch `main`).
+2. Em *Environment Variables*, preencha `COPILOTO_PASSWORD`, `TF_EMAIL`, `TF_PASSWORD`, `BRAPI_TOKEN`,
+   `COOKIE_SECURE=true` e `TRUST_PROXY` (1 se só o Coolify; 2 se o nginx estiver na frente dele).
+3. Associe o domínio ao serviço `copiloto`, porta 5000. O mapeamento `ports:` do compose é opcional no Coolify.
+4. As cotações ao vivo usam **Server-Sent Events** (`/api/stream`). O app já manda `X-Accel-Buffering: no`; se o
+   nginx tiver configuração própria para o site, garanta:
+
+```nginx
+location /api/stream {
+    proxy_pass http://<upstream>;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+}
+```
+
+Se algum proxy segurar o stream mesmo assim, a tela percebe em ~45 s e passa a consultar `/api/quotes` a cada 3 s.
 
 ### Windows (local)
 
@@ -43,6 +65,29 @@ Copie `config/.env.example` para `config/.env`, preencha `TF_EMAIL`/`TF_PASSWORD
 | Resultado real, slippage vs. analista, IR/DARF, CSV | **Resultados** |
 | Quem vale a pena seguir? Backtest de cópia, screeners, IA, base de conhecimento | **Laboratório** |
 
+## Cotações
+
+| Fonte | O quê | Atraso | Quando |
+|---|---|---|---|
+| **MT5** (agente no Windows) | ações e opções, com compra × venda | tempo real (a cada 2 s) | se `MT5_AGENT_URL`/`MT5_AGENT_TOKEN` estiverem definidos |
+| **brapi.dev** | só ações | até 30 min (plano gratuito) | se `BRAPI_TOKEN` estiver definido e a ação não tiver MT5 ao vivo |
+| **TradingFloors** | opções abertas dos sinais | desconhecido | sempre (reserva) |
+| manual | qualquer ativo | — | Carteira › clicar no preço |
+
+Os preços mudam na tela sem recarregar (Hoje, Carteira, Sinais, boleta e confirmação de ordem), com a fonte e o horário
+de cada cotação. Com MT5 ao vivo, a boleta usa a **oferta de venda** para compras e a **de compra** para vendas.
+Se o MT5 cair, ações passam para a brapi e opções voltam ao TradingFloors em ~2 min — o chip *Cotações* e a boleta avisam.
+
+**brapi no plano gratuito** (1 ativo por requisição, dados renovados a cada 30 min, 15.000 requisições numa janela
+móvel de 30 dias). O Copiloto dimensiona as consultas para não estourar:
+
+- no máximo `BRAPI_DAILY_BUDGET=450` requisições por dia (90% de 15.000/30), contadas no banco;
+- só ações acompanhadas (posições, ordens, sinais abertos dos analistas seguidos, boleta aberta) e sem MT5 ao vivo;
+- no pregão, cada ação no máximo a cada 30 min; com muitas ações o intervalo cresce para o teto durar até o fechamento
+  (até ~30 ações a cada 30 min cabem no teto); depois do pregão, uma consulta por ação para o fechamento;
+- lê o saldo da janela de 30 dias informado pela brapi e pausa até o dia seguinte se restarem menos de 1.000, ou se ela
+  responder 429. Uso e saldo aparecem em Configurações › Cotações.
+
 ## Execução de ordens (Fase 6)
 
 Modos (Configurações › Execução):
@@ -64,14 +109,21 @@ fica registrada (Carteira › Decisões da automação). **Pânico** desarma e c
 
 ### MetaTrader 5 com o Copiloto no Docker
 
-O pacote `MetaTrader5` só funciona no Windows, junto do terminal. Por isso existe o **agente MT5**:
+O MetaTrader 5 não tem versão nativa para Linux (só via Wine, que o Copiloto não usa), e o pacote Python
+`MetaTrader5` só funciona no Windows, junto do terminal. Por isso existe o **agente MT5**, que roda no Windows — num
+homelab com WSL, o próprio Windows que hospeda o WSL:
 
-1. No PC Windows com o MT5 aberto, logado e com *Algo Trading* ligado, defina `MT5_AGENT_TOKEN` em `config/.env`
-   (gere com `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
-2. Rode `start_mt5_agent.bat` (escuta na porta 8765; libere-a no firewall só para o IP do homelab).
-3. No `.env` do Docker: `EXECUTION_BROKER=mt5_remote`, `MT5_AGENT_URL=http://<ip-do-windows>:8765` e o mesmo `MT5_AGENT_TOKEN`.
+1. No Windows, com o MT5 aberto e logado (e *Algo Trading* ligado, se for enviar ordens), defina `MT5_AGENT_TOKEN`
+   em `config/.env` (gere com `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
+2. Rode `start_mt5_agent.bat` — ou `start_mt5_agent.bat --readonly` para **só cotações** (o agente recusa ordens).
+   Ele escuta na porta 8765; libere-a no Firewall do Windows (PowerShell como administrador):
+   `New-NetFirewallRule -DisplayName "Copiloto MT5" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Allow -RemoteAddress LocalSubnet`
+3. No Docker/Coolify: `MT5_AGENT_URL=http://<ip-do-windows-na-rede>:8765` e o mesmo `MT5_AGENT_TOKEN`.
+   Use o IP do Windows na rede local (o IP interno do WSL muda a cada boot). Com `networkingMode=mirrored` no
+   `.wslconfig`, ative também `hostAddressLoopback=true` para os containers alcançarem o IP do próprio host.
 
-Rodando o Copiloto no próprio Windows, use `EXECUTION_BROKER=mt5_local` (sem agente).
+O horário dos ticks/negócios do MT5 vem no fuso do servidor da corretora (Brasília nas corretoras da B3;
+`MT5_SERVER_UTC_OFFSET=-3`). Rodando o Copiloto no próprio Windows, use `EXECUTION_BROKER=mt5_local` (sem agente).
 
 ## Notas de corretagem
 
@@ -95,8 +147,8 @@ Dockerfile, docker-compose.yml, .env.example
 config/settings.yaml       # infraestrutura (API TF, monitor, trava de execução)
 src/
   core/                    # config, banco + migrações, calendário B3, tickers/opções
-  integrations/            # cliente TradingFloors + deduplicação única
-  services/                # monitor, boleta, diário/posições, carteira, alertas, IR, resultados, notas de corretagem
+  integrations/            # cliente TradingFloors + deduplicação única, fontes de cotação (MT5, brapi)
+  services/                # monitor, cotações ao vivo, boleta, diário/posições, carteira, alertas, IR, resultados, notas
   execution/               # Fase 6: ordens, risco, automação, conectores (simulação, MT5 local/remoto), agente MT5
   lab/                     # backtest de cópia, taxas BCB, TimesFM sob demanda
 strategies/                # screeners, backtest de opções, base de conhecimento, ingestão YouTube

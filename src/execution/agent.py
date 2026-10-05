@@ -4,9 +4,10 @@ para o Copiloto (que pode estar em Docker no homelab).
 
     set MT5_AGENT_TOKEN=um-token-longo-e-secreto
     python -m src.execution.agent --host 0.0.0.0 --port 8765
+    python -m src.execution.agent --readonly      # só cotações: recusa qualquer ordem
 
 Requisitos no Windows: pip install flask MetaTrader5 python-dotenv pyyaml
-No terminal MT5: conta logada e "Algo Trading" ligado.
+No terminal MT5: conta logada (e "Algo Trading" ligado, para ordens).
 Toda requisição precisa de `Authorization: Bearer <MT5_AGENT_TOKEN>`.
 """
 import hmac
@@ -21,10 +22,14 @@ from src.execution.brokers.base import Broker, BrokerError
 log = logging.getLogger("mt5-agent")
 
 
-def create_agent(broker: Broker, token: str) -> Flask:
+MAX_SYMBOLS = 100
+
+
+def create_agent(broker: Broker, token: str, readonly: bool = False) -> Flask:
     if not token or len(token) < 16:
         raise SystemExit("Defina MT5_AGENT_TOKEN com pelo menos 16 caracteres (o mesmo no Copiloto).")
     app = Flask("mt5_agent")
+    readonly_msg = "Agente MT5 em modo somente cotações (MT5_AGENT_READONLY) — ordens desativadas"
 
     @app.before_request
     def _auth():
@@ -44,14 +49,25 @@ def create_agent(broker: Broker, token: str) -> Flask:
 
     @app.get("/health")
     def health():
-        return jsonify(broker.health())
+        h = dict(broker.health())
+        h["readonly"] = readonly
+        if readonly and h.get("connected"):
+            h.update(ok=False, message=readonly_msg)
+        return jsonify(h)
 
     @app.get("/quote/<symbol>")
     def quote(symbol):
         return jsonify({"quote": broker.quote(symbol.upper())})
 
+    @app.get("/quotes")
+    def quotes():
+        symbols = [s.strip().upper() for s in request.args.get("symbols", "").split(",") if s.strip()]
+        return jsonify({"quotes": broker.quotes(list(dict.fromkeys(symbols))[:MAX_SYMBOLS])})
+
     @app.post("/orders")
     def place():
+        if readonly:
+            return jsonify({"error": readonly_msg}), 403
         d = request.get_json(silent=True) or {}
         side = str(d.get("side", "")).upper()
         order_type = d.get("order_type", "limit")
@@ -70,6 +86,8 @@ def create_agent(broker: Broker, token: str) -> Flask:
 
     @app.post("/orders/<oid>/cancel")
     def cancel(oid):
+        if readonly:
+            return jsonify({"error": readonly_msg}), 403
         d = request.get_json(silent=True) or {}
         return jsonify(broker.cancel_order(oid, d.get("symbol", "")))
 
@@ -86,6 +104,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Agente MT5 do Copiloto de Trades")
     parser.add_argument("--host", default=os.getenv("MT5_AGENT_HOST", "0.0.0.0"))
     parser.add_argument("--port", type=int, default=int(os.getenv("MT5_AGENT_PORT", 8765)))
+    parser.add_argument("--readonly", action="store_true", default=os.getenv("MT5_AGENT_READONLY", "").lower() in ("1", "true", "yes"),
+                        help="somente cotações: recusa envio/cancelamento de ordens")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -95,8 +115,8 @@ def main() -> None:
     print(f"MT5: {h['message']}" + (f" · conta {h['account']['login']} ({h['account']['company']})" if h.get("account") else ""))
     if sys.platform != "win32":
         print("Aviso: o pacote MetaTrader5 só funciona no Windows.")
-    app = create_agent(broker, os.getenv("MT5_AGENT_TOKEN", ""))
-    print(f"Agente MT5 ouvindo em http://{args.host}:{args.port}")
+    app = create_agent(broker, os.getenv("MT5_AGENT_TOKEN", ""), readonly=args.readonly)
+    print(f"Agente MT5 ouvindo em http://{args.host}:{args.port}" + (" — SOMENTE COTAÇÕES" if args.readonly else ""))
     app.run(host=args.host, port=args.port, threaded=True)
 
 

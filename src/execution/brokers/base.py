@@ -21,8 +21,12 @@ class Broker:
         raise NotImplementedError
 
     def quote(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """{'bid', 'ask', 'last', 'time'} ou None"""
+        """{'bid', 'ask', 'last', 'time', 'change_pct'?} ou None"""
         raise NotImplementedError
+
+    def quotes(self, symbols: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+        """Várias cotações de uma vez (conectores podem otimizar)."""
+        return {s: self.quote(s) for s in symbols}
 
     def place_order(self, symbol: str, side: str, quantity: float, order_type: str,
                     limit_price: Optional[float], comment: str = "") -> Dict[str, Any]:

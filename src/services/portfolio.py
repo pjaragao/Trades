@@ -7,6 +7,7 @@ from src.core import db
 from src.core.config import get_prefs
 from src.core.market_hours import now_brt, to_brt
 from src.services import journal
+from src.services.quotes import live_quote
 from src.services.signals import hydrate, signal_return_pct
 
 SIGNAL_LINK_WINDOW_DAYS = 5
@@ -65,7 +66,7 @@ def positions(conn=None, led: Optional[Dict[str, Any]] = None, account: str = "r
                     linked, guessed = [g], True
             primary = linked[0] if linked else None
 
-            q = quotes.get(p["ticker"])
+            q = live_quote(p["ticker"]) or quotes.get(p["ticker"])
             last = q["price"] if q else (primary.get("preco_atual") if primary else None)
             qty = abs(p["qty"])
             if last is not None:
@@ -99,7 +100,10 @@ def positions(conn=None, led: Optional[Dict[str, Any]] = None, account: str = "r
                 "quantity": qty,
                 "last_price": last,
                 "last_price_source": q["source"] if q else ("tradingfloors" if last is not None else None),
-                "last_price_at": q["updated_at"] if q else None,
+                "last_price_at": (q.get("at") or q.get("updated_at")) if q else None,
+                "last_bid": q.get("bid") if q else None,
+                "last_ask": q.get("ask") if q else None,
+                "quote_live": bool(q and q.get("live")),
                 "market_value": market_value,
                 "unrealized_pnl": unreal,
                 "unrealized_pct": round(unreal / p["invested"] * 100, 2) if unreal is not None and p["invested"] else None,
@@ -157,12 +161,10 @@ def set_manual_quote(ticker: str, price: float, conn=None) -> None:
 
     if price is None or float(price) < 0:
         raise ValueError("Preço inválido")
+    from src.services.quotes import upsert_quote
+
     with db.transaction(conn) as c:
-        c.execute(
-            "INSERT INTO quotes(ticker, price, source, updated_at) VALUES(?,?,?,?) "
-            "ON CONFLICT(ticker) DO UPDATE SET price = excluded.price, source = excluded.source, updated_at = excluded.updated_at",
-            (clean_ticker(ticker), float(price), "manual", now_iso()),
-        )
+        upsert_quote(c, clean_ticker(ticker), float(price), "manual", now=now_iso())
 
 
 def keep_position(cycle_id: str, conn=None) -> None:

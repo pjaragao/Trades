@@ -3,6 +3,7 @@ import { get, post } from './api.js';
 import * as f from './format.js';
 import { emit, on, state } from './state.js';
 import { handleNewAlerts, initLastSeen } from './notify.js';
+import { quotesChipHtml, startLive } from './live.js';
 import { closeAllModals, esc, icon, toast, toastError } from './ui.js';
 import { openSignalModal } from './components/signal_modal.js';
 
@@ -95,6 +96,7 @@ function renderTopbar(st) {
   document.getElementById('topbar-chips').innerHTML = `
     ${marketChip(st.market)}
     ${monitorChip(st.monitor)}
+    ${quotesChipHtml(state.quotesFeed || st.quotes)}
     ${execChip(st.execution)}
     <span class="chip chip-button" data-go="carteira" title="Capital livre / total"><span>Capital</span><strong class="mono">${f.brl(p.free, { dec: 0 })}</strong><span class="faint">/ ${f.brl(p.capital, { dec: 0 })}</span></span>
     <span class="chip chip-button" data-go="resultados" title="Resultado realizado hoje · P&L em aberto"><span>Hoje</span><strong class="mono ${f.tone(p.realized_today)}">${f.brl(p.realized_today, { sign: true, dec: 0 })}</strong><span class="faint">aberto</span><strong class="mono ${f.tone(p.unrealized_pnl)}">${f.brl(p.unrealized_pnl, { sign: true, dec: 0 })}</strong></span>`;
@@ -232,6 +234,7 @@ async function boot() {
 
   if (!location.hash) history.replaceState(null, '', '#/hoje');
   await pollStatus();
+  startLive();
   await Promise.all([route(), pollTodayBadge()]);
   setInterval(pollStatus, STATUS_MS);
   setInterval(pollTodayBadge, STATUS_MS * 2);

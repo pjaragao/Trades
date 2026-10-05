@@ -3,7 +3,12 @@ Conector direto ao terminal MetaTrader 5 (pacote `MetaTrader5`, só no Windows).
 
 Usado pelo agente (src/execution/agent.py) ou pelo próprio Copiloto quando roda no Windows.
 A API do MT5 não é thread-safe: todas as chamadas passam por um lock.
+
+Horários: o MT5 devolve o horário do SERVIDOR da corretora como se fosse UTC. Nas corretoras da B3 o
+servidor usa o horário de Brasília (MT5_SERVER_UTC_OFFSET, padrão -3); se o resultado cair no
+futuro, o servidor está em UTC e o valor é usado direto.
 """
+import os
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -16,12 +21,27 @@ STATE_MAP = {0: "open", 1: "open", 2: "cancelled", 3: "partial", 4: "filled", 5:
 class Mt5LocalBroker(Broker):
     name = "mt5"
 
-    def __init__(self, terminal_path: str = "", magic: int = 998877, mt5_module=None):
+    def __init__(self, terminal_path: str = "", magic: int = 998877, mt5_module=None, server_utc_offset: Optional[float] = None):
         self.terminal_path = terminal_path
         self.magic = magic
         self._mt5 = mt5_module
         self._lock = threading.RLock()
         self._initialized = False
+        self._selected: set = set()
+        if server_utc_offset is None:
+            try:
+                server_utc_offset = float(os.getenv("MT5_SERVER_UTC_OFFSET") or -3)
+            except ValueError:
+                server_utc_offset = -3.0
+        self.server_tz = timezone(timedelta(hours=server_utc_offset))
+
+    def _ts(self, value: float) -> str:
+        """Horário do servidor MT5 -> ISO em UTC."""
+        raw = datetime.fromtimestamp(float(value), timezone.utc)
+        local = raw.replace(tzinfo=self.server_tz).astimezone(timezone.utc)
+        if local > datetime.now(timezone.utc) + timedelta(minutes=10):
+            local = raw
+        return local.isoformat(timespec="seconds")
 
     # ------------------------------------------------------------------ conexão
     @property
@@ -45,6 +65,7 @@ class Mt5LocalBroker(Broker):
         if not mt5.initialize(**kwargs):
             raise BrokerError(f"Não foi possível conectar ao terminal MT5: {mt5.last_error()}")
         self._initialized = True
+        self._selected.clear()
 
     def health(self) -> Dict[str, Any]:
         with self._lock:
@@ -70,16 +91,32 @@ class Mt5LocalBroker(Broker):
                 },
             }
 
+    def _tick(self, symbol: str) -> Optional[Dict[str, Any]]:
+        mt5 = self.mt5
+        if symbol not in self._selected:
+            if not mt5.symbol_select(symbol, True):  # símbolo inexistente nesta corretora
+                return None
+            self._selected.add(symbol)
+        t = mt5.symbol_info_tick(symbol)
+        if not t:
+            return None
+        bid, ask, last = (t.bid or None), (t.ask or None), (getattr(t, "last", 0) or None)
+        if not (bid or ask or last):  # recém-adicionado ao Market Watch, ainda sem dados
+            return None
+        info = mt5.symbol_info(symbol)
+        change = getattr(info, "price_change", None) if info is not None else None
+        return {"bid": bid, "ask": ask, "last": last, "time": self._ts(t.time) if t.time else None,
+                "change_pct": round(float(change), 2) if change not in (None, 0) else None}
+
     def quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             self._ensure()
-            mt5 = self.mt5
-            mt5.symbol_select(symbol, True)
-            t = mt5.symbol_info_tick(symbol)
-            if not t:
-                return None
-            return {"bid": t.bid or None, "ask": t.ask or None, "last": getattr(t, "last", 0) or None,
-                    "time": datetime.fromtimestamp(t.time, timezone.utc).isoformat(timespec="seconds")}
+            return self._tick(symbol)
+
+    def quotes(self, symbols: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+        with self._lock:
+            self._ensure()
+            return {s: self._tick(s) for s in symbols}
 
     # ------------------------------------------------------------------ ordens
     def place_order(self, symbol, side, quantity, order_type, limit_price, comment=""):
@@ -125,7 +162,7 @@ class Mt5LocalBroker(Broker):
                 continue
             fees = abs(float(getattr(d, "commission", 0) or 0)) + abs(float(getattr(d, "fee", 0) or 0))
             out.append({"id": str(d.ticket), "quantity": float(d.volume), "price": float(d.price), "fees": round(fees, 2),
-                        "time": datetime.fromtimestamp(d.time, timezone.utc).isoformat(timespec="seconds")})
+                        "time": self._ts(d.time)})
         return out
 
     def order_status(self, broker_order_id: str, symbol: str) -> Dict[str, Any]:

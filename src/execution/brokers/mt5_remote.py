@@ -35,6 +35,8 @@ class Mt5RemoteBroker(Broker):
             raise BrokerError(f"Resposta inválida do agente MT5 (HTTP {resp.status_code})") from exc
         if resp.status_code >= 500 or (resp.status_code >= 400 and "error" in data):
             raise BrokerError(data.get("error") or f"Erro no agente MT5 (HTTP {resp.status_code})")
+        if resp.status_code >= 400:
+            raise BrokerError(f"Erro no agente MT5 (HTTP {resp.status_code})")
         return data
 
     def health(self) -> Dict[str, Any]:
@@ -45,6 +47,16 @@ class Mt5RemoteBroker(Broker):
 
     def quote(self, symbol: str):
         return self._call("GET", f"/quote/{symbol}").get("quote")
+
+    def quotes(self, symbols):
+        if not symbols:
+            return {}
+        try:
+            return self._call("GET", "/quotes", params={"symbols": ",".join(symbols)}).get("quotes") or {}
+        except BrokerError as exc:
+            if "HTTP 404" not in str(exc):
+                raise
+            return super().quotes(symbols)  # agente de versão anterior, sem /quotes
 
     def place_order(self, symbol, side, quantity, order_type, limit_price, comment=""):
         return self._call("POST", "/orders", json={

@@ -6,6 +6,7 @@ from src.core import db
 from src.core.config import execution_flags, get_prefs
 from src.core.market_hours import market_status, now_brt, to_brt
 from src.services import alerts, journal, performance, portfolio, signals
+from src.services.quotes import get_feed
 from src.services.signal_monitor import get_monitor
 from src.services.sizing import build_ticket, exit_ticket
 
@@ -21,6 +22,7 @@ def status():
         "portfolio": portfolio.summary(),
         "alerts": {"unread": alerts.unread_count(), "last_id": alerts.last_id()},
         "execution": {**{k: v for k, v in execution_flags().items() if k != "mt5_agent_token"}, **_exec_state()},
+        "quotes": get_feed().status(),
         "now": now_brt().isoformat(timespec="seconds"),
     })
 

@@ -280,32 +280,11 @@ def cancel_all(account: Optional[str] = None) -> int:
     return n
 
 
-def refresh_quotes_from_broker(max_tickers: int = 15) -> int:
-    """No modo real, atualiza a cotação das posições abertas pelo MT5 (mais atual que o TradingFloors)."""
-    state = execution_state()
-    if state["mode"] != "live" or not state["can_send"]:
-        return 0
-    try:
-        broker = get_broker("real")
-    except BrokerError:
-        return 0
-    tickers = [p["ticker"] for p in journal.ledger(None, "real")["positions"]][:max_tickers]
-    n = 0
-    for t in tickers:
-        try:
-            q = broker.quote(t)
-        except BrokerError:
-            return n
-        if not q:
-            continue
-        price = q.get("last") or (((q.get("bid") or 0) + (q.get("ask") or 0)) / 2 if q.get("bid") and q.get("ask") else None)
-        if not price:
-            continue
-        with db.transaction() as c:
-            c.execute("INSERT INTO quotes(ticker, price, source, updated_at) VALUES(?,?,?,?) ON CONFLICT(ticker) DO UPDATE SET "
-                      "price = excluded.price, source = excluded.source, updated_at = excluded.updated_at", (t, float(price), "mt5", now_iso()))
-        n += 1
-    return n
+def refresh_quotes_from_broker() -> bool:
+    """Antes da automação decidir: garante cotações frescas pelo feed ao vivo (src/services/quotes.py)."""
+    from src.services.quotes import get_feed
+
+    return get_feed().ensure_fresh()
 
 
 __all__ = ["execution_state", "submit", "sync_open_orders", "cancel", "cancel_all", "list_orders", "get_order",

@@ -13,6 +13,7 @@ from src.core import db
 from src.core.config import get_prefs, now_iso
 from src.core.market_hours import now_brt, to_brt
 from src.integrations.tradingfloors import signal_to_db_row
+from src.services.quotes import fallback_reason, live_quote, upsert_tradingfloors_quote
 
 AUTHORITATIVE_FIELDS = [
     "produto", "tipo_ativo", "asset_class", "ticker", "underlying", "expiration", "trader", "lado",
@@ -168,13 +169,7 @@ def mark_closed(conn, signal_id: str, preco_saida: Optional[float] = None, note:
 
 
 def _upsert_quote(conn, ticker: str, price: Optional[float], now: str) -> None:
-    if price is None or not ticker:
-        return
-    conn.execute(
-        "INSERT INTO quotes(ticker, price, source, updated_at) VALUES(?,?,?,?) "
-        "ON CONFLICT(ticker) DO UPDATE SET price = excluded.price, source = excluded.source, updated_at = excluded.updated_at",
-        (ticker, float(price), "tradingfloors", now),
-    )
+    upsert_tradingfloors_quote(conn, ticker, price, now)
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +203,12 @@ def hydrate(row: Dict[str, Any], prefs: Dict[str, Any], decision: Optional[Dict[
     now = now_brt()
     sig["age_hours"] = round((now - entry_dt).total_seconds() / 3600, 1) if entry_dt else None
     sig["followed"] = is_followed(sig, prefs)
+    # cotação ao vivo (MT5/brapi) substitui o preço do TradingFloors, que tem atraso desconhecido
+    sig["quote"] = live_quote(sig.get("ticker")) if sig["status"] == "OPEN" else None
+    sig["quote_fallback"] = fallback_reason(sig.get("ticker")) if sig["status"] == "OPEN" and not sig["quote"] else None
+    if sig["quote"]:
+        sig["preco_atual"] = sig["quote"]["price"]
+        sig["preco_atual_at"] = sig["quote"]["at"]
     sig["return_now_pct"] = signal_return_pct(sig, sig.get("preco_atual")) if sig["status"] == "OPEN" else None
     sig["return_final_pct"] = signal_return_pct(sig, sig.get("preco_saida")) if sig["status"] == "CLOSED" else None
     if sig.get("expiration"):

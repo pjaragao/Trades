@@ -6,7 +6,12 @@ import { bindTickets, exitCard, ticketCard } from '../components/ticket.js';
 import { openSignalModal } from '../components/signal_modal.js';
 import { openExecutionForm } from '../components/exec_form.js';
 import { emit } from '../state.js';
+import { applyLive, livePnlAttrs } from '../live.js';
 import { esc, icon, loading, modalOpen, toastError } from '../ui.js';
+
+// campos que mudam a cada cotação: não justificam redesenhar a tela (os valores ao vivo são atualizados no lugar)
+const VOLATILE = new Set(['quote', 'age_seconds', 'preco_atual_at', 'last_price_at', 'at']);
+const stableJson = (d) => JSON.stringify(d, (k, v) => (VOLATILE.has(k) ? undefined : v));
 
 const seen = new Set(); // sinais já exibidos nesta sessão (para animar só os novos)
 
@@ -22,7 +27,7 @@ function tiles(s) {
   return `
   <div class="grid grid-4 section">
     <div class="card tile"><div class="tile-label">Resultado hoje</div><div class="tile-value ${f.tone(s.realized_today)}">${f.brl(s.realized_today, { sign: true })}</div><div class="tile-sub">realizado</div></div>
-    <div class="card tile"><div class="tile-label">Em aberto</div><div class="tile-value ${f.tone(s.unrealized_pnl)}">${f.brl(s.unrealized_pnl, { sign: true })}</div><div class="tile-sub">${s.open_positions} posição(ões)${s.unpriced_positions ? ` · ${s.unpriced_positions} sem cotação` : ''}</div></div>
+    <div class="card tile"><div class="tile-label">Em aberto</div><div class="tile-value ${f.tone(s.unrealized_pnl)}" data-lsum="pnl">${f.brl(s.unrealized_pnl, { sign: true })}</div><div class="tile-sub">${s.open_positions} posição(ões)${s.unpriced_positions ? ` · ${s.unpriced_positions} sem cotação` : ''}</div></div>
     <div class="card tile"><div class="tile-label">Resultado do mês</div><div class="tile-value ${f.tone(s.realized_month)}">${f.brl(s.realized_month, { sign: true })}</div><div class="tile-sub">realizado, com custos</div></div>
     <div class="card tile"><div class="tile-label">Capital livre</div><div class="tile-value">${f.brl(s.free)}</div><div class="tile-sub">de ${f.brl(s.capital)} · investido ${f.brl(s.invested)}</div></div>
   </div>`;
@@ -40,8 +45,8 @@ function positionsTable(positions) {
         <td>${p.signal ? `${esc(p.signal.trader)}<span class="cell-sub">${p.signal.status === 'OPEN' ? 'aberto' : 'encerrado'}</span>` : '<span class="faint">manual</span>'}</td>
         <td class="num r">${f.qty(p.quantity)}</td>
         <td class="num r">${f.brl(p.avg_price)}</td>
-        <td class="num r">${p.last_price === null ? '—' : f.brl(p.last_price)}</td>
-        <td class="num r ${f.tone(p.unrealized_pnl)}">${f.brl(p.unrealized_pnl, { sign: true })}<span class="cell-sub ${f.tone(p.unrealized_pct)}">${f.pct(p.unrealized_pct)}</span></td>
+        <td class="num r"><span data-lp="${esc(p.ticker)}">${p.last_price === null ? '—' : f.brl(p.last_price)}</span></td>
+        <td class="num r"><span class="${f.tone(p.unrealized_pnl)}" ${livePnlAttrs(p)} data-lsum-src data-v="${p.unrealized_pnl ?? ''}" data-mv="${p.market_value ?? ''}">${f.brl(p.unrealized_pnl, { sign: true })}</span><span class="cell-sub ${f.tone(p.unrealized_pct)}" ${livePnlAttrs(p)} data-fmt="pct">${f.pct(p.unrealized_pct)}</span></td>
         <td class="num r ${f.tone(p.signal_return_pct)}">${f.pct(p.signal_return_pct)}</td>
       </tr>`).join('')}</tbody></table></div>`;
 }
@@ -90,12 +95,13 @@ export default {
         </section>`;
       newIds.forEach((id) => seen.add(id));
       if (!seen.size) seen.add('__init__');
+      applyLive(root);
     };
 
     const load = async (force = false) => {
       try {
         const fresh = await get('/api/today');
-        const json = JSON.stringify(fresh);
+        const json = stableJson(fresh);
         if (!force && json === lastJson) return;
         // não atrapalha quem está digitando ou com modal aberto
         if (!force && data && (modalOpen() || root.contains(document.activeElement) && document.activeElement.matches('input'))) return;

@@ -8,7 +8,7 @@ Tabelas:
 - decisions   : minha decisão por sinal (executado / ignorado / adiado)
 - executions  : o que eu executei no Home Broker (fonte da verdade para posições e P&L)
 - alerts      : novo sinal, saída pendente, stop/alvo, avisos do sistema
-- quotes      : último preço conhecido por ativo (TradingFloors ou manual)
+- quotes      : último preço conhecido por ativo (MT5 ao vivo, brapi, TradingFloors ou manual)
 - settings    : preferências do usuário (JSON por seção)
 - kv          : estado interno (baseline do monitor, última sincronização etc.)
 - orders / order_fills : ordens enviadas ao MT5 ou à conta simulada (Fase 6) e seus preenchimentos
@@ -208,6 +208,14 @@ MIGRATIONS = [
         imported_at TEXT NOT NULL,
         UNIQUE (broker, number, trade_date)
     );
+    """,
+    # v3 — cotações ao vivo (MT5): bid/ask, último negócio, horário do negócio e variação do dia
+    """
+    ALTER TABLE quotes ADD COLUMN bid REAL;
+    ALTER TABLE quotes ADD COLUMN ask REAL;
+    ALTER TABLE quotes ADD COLUMN last REAL;
+    ALTER TABLE quotes ADD COLUMN quote_time TEXT;
+    ALTER TABLE quotes ADD COLUMN change_pct REAL;
     """,
 ]
 

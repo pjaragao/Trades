@@ -1,9 +1,66 @@
 // Tela CONFIGURAÇÕES
 import { get, post, put } from '../api.js';
 import * as f from '../format.js';
-import { emit, state } from '../state.js';
+import { emit, on, state } from '../state.js';
 import { beep, permission, requestPermission } from '../notify.js';
 import { confirmDialog, esc, icon, loading, toast, toastError } from '../ui.js';
+
+function quotesStatusHtml(fd) {
+  if (!fd) return '<span class="spinner"></span>';
+  const map = {
+    live: ['badge-ok', fd.realtime ? 'Ao vivo' : 'Conectado'], delayed: ['badge-warn', 'Atrasadas'],
+    error: ['badge-warn', 'Indisponível — usando TradingFloors'], off: ['', 'Sem fonte ao vivo — usando TradingFloors'],
+    starting: ['badge-info', 'Conectando…'],
+  };
+  const [cls, label] = map[fd.state] || ['', fd.state];
+  return `<span class="badge ${cls} badge-plain" title="${esc(fd.message || '')}">${esc(label)}</span>`;
+}
+
+function quotesDetail(fd) {
+  if (!fd) return '—';
+  const parts = [`${fd.watching} ativo(s)`];
+  if (fd.realtime && fd.latency_ms !== null && fd.latency_ms !== undefined) parts.push(`latência ${fd.latency_ms} ms`);
+  if (fd.realtime && fd.last_ok_at) parts.push(`última resposta ${f.time(fd.last_ok_at)}`);
+  if (fd.message) parts.push(fd.message);
+  return esc(parts.join(' · '));
+}
+
+function brapiDetail(fd) {
+  const b = fd && fd.brapi;
+  if (!b) return '—';
+  const parts = [`${b.used_today} de ${b.daily_budget} requisições hoje`];
+  if (b.remaining !== null && b.remaining !== undefined) parts.push(`${f.qty(b.remaining)} de ${f.qty(b.limit || 15000)} restantes na janela de 30 dias`);
+  if (b.interval_minutes) parts.push(`cada ação a cada ${b.interval_minutes} min no pregão`);
+  if (b.paused) parts.push(`pausado: ${b.pause_reason}`);
+  if (b.error) parts.push(`erro: ${b.error}`);
+  return esc(parts.join(' · '));
+}
+
+function quotesCard(sys) {
+  const md = sys.market_data;
+  const ex = sys.execution;
+  const srcs = [];
+  if (md.mt5) srcs.push(ex.broker === 'mt5_local' ? 'MT5 local (Windows) — tempo real' : `agente MT5 em ${ex.mt5_agent_url} — tempo real`);
+  if (md.brapi) srcs.push(`brapi.dev — ações, a cada ${Math.round(md.brapi_min_interval / 60)} min (plano gratuito)`);
+  const src = srcs.join(' · ') || 'nenhuma fonte ao vivo';
+  const fd = state.quotesFeed || state.status?.quotes;
+  return `
+  <section class="card span-all" id="quotes-card">
+    <div class="card-head"><h2>${icon('chart')} Cotações</h2><span id="quotes-status">${quotesStatusHtml(fd)}</span></div>
+    <div class="card-body stack">
+      <dl class="kv">
+        <dt>Fontes</dt><dd>${esc(src)}</dd>
+        ${md.mt5 ? `<dt>MT5</dt><dd>a cada ${f.num(md.interval, md.interval % 1 ? 1 : 0)} s no pregão · ${Math.round(md.closed_interval / 60)} min fora dele</dd>` : ''}
+        <dt>Reserva</dt><dd>${md.brapi ? 'brapi para ações; ' : ''}TradingFloors para opções (atraso desconhecido); cotação manual</dd>
+        <dt>Agora</dt><dd id="quotes-detail">${quotesDetail(fd)}</dd>
+        ${md.brapi ? `<dt>Cota da brapi</dt><dd id="brapi-detail">${brapiDetail(fd)}</dd>` : ''}
+      </dl>
+      ${md.brapi ? `<p class="hint">Plano gratuito da brapi: 1 ação por requisição, dados renovados a cada 30 min e 15.000 requisições em 30 dias. O Copiloto usa no máximo ${md.brapi_daily_budget} por dia, só para ações (opções ficam com o TradingFloors) e só quando o MT5 não estiver ao vivo.</p>` : ''}
+      ${md.mt5 ? '<p class="hint">MT5 parado ou sem cotação de um ativo: ações passam para a brapi (se configurada) e opções voltam ao preço do TradingFloors em ~2 min — a boleta avisa.</p>'
+        : '<p class="hint">Para tempo real com compra × venda (ações e opções): rode o agente MT5 no Windows (<code>start_mt5_agent.bat --readonly</code> serve só para cotações) e defina <code>MT5_AGENT_URL</code> e <code>MT5_AGENT_TOKEN</code> no servidor. Veja o README.</p>'}
+    </div>
+  </section>`;
+}
 
 function execCard(p, sys) {
   const ex = p.execution;
@@ -147,6 +204,7 @@ export default {
           </div>
         </section>
 
+        ${quotesCard(sys)}
         ${execCard(p, sys)}
 
         <section class="card">
@@ -262,6 +320,15 @@ export default {
         toast('Configurações salvas', 'success');
         emit('data-changed');
       } catch (err) { toastError(err); }
+    });
+
+    return on('quotes', (d) => {
+      const st = root.querySelector('#quotes-status');
+      if (st) st.innerHTML = quotesStatusHtml(d.feed);
+      const det = root.querySelector('#quotes-detail');
+      if (det) det.innerHTML = quotesDetail(d.feed);
+      const bd = root.querySelector('#brapi-detail');
+      if (bd) bd.innerHTML = brapiDetail(d.feed);
     });
   },
 };

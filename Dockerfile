@@ -1,5 +1,6 @@
-# Copiloto de Trades — imagem para homelab (Linux).
-# O MetaTrader 5 NÃO roda aqui: para ordens reais, rode o agente MT5 no Windows (veja README).
+# Copiloto de Trades — imagem para homelab (Linux/WSL, Docker ou Coolify).
+# O MetaTrader 5 NÃO roda aqui (não existe versão nativa para Linux): para cotações em tempo real e ordens,
+# rode o agente MT5 no Windows (veja README). Sem ele, ações vêm da brapi e opções do TradingFloors.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -29,8 +30,8 @@ COPY . .
 
 RUN useradd --uid 1000 --create-home copiloto \
  && mkdir -p /data \
- && chown -R copiloto:copiloto /data /app/strategies /app/config
-USER copiloto
+ && chown -R copiloto:copiloto /data /app/strategies /app/config \
+ && chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 5000
 VOLUME ["/data"]
@@ -38,5 +39,8 @@ VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=4).status == 200 else 1)"
 
-# 1 worker (o monitor de sinais é uma thread do processo) + threads para as requisições
-CMD ["gunicorn", "--workers", "1", "--threads", "8", "--bind", "0.0.0.0:5000", "--timeout", "180", "--access-logfile", "-", "wsgi:app"]
+# O entrypoint começa como root só para ajustar o dono de /data e então troca para o usuário copiloto.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# 1 worker (monitor de sinais e feed de cotações são threads do processo); 16 threads porque cada aba aberta
+# mantém uma conexão de cotações ao vivo (SSE) por alguns minutos.
+CMD ["gunicorn", "--workers", "1", "--threads", "16", "--bind", "0.0.0.0:5000", "--timeout", "180", "--access-logfile", "-", "wsgi:app"]

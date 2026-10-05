@@ -55,6 +55,13 @@ def build_ticket(
     entry = float(signal.get("preco_entrada") or 0)
     current = signal.get("preco_atual")
     current = float(current) if current is not None else None
+    # com book ao vivo (MT5), "agora" é o preço que eu pagaria/receberia: oferta de venda na compra, de compra na venda
+    quote = signal.get("quote") or None
+    basis = "last" if current is not None else None
+    if quote and quote.get("live"):
+        book = quote.get("ask") if is_buy else quote.get("bid")
+        if book:
+            current, basis = float(book), ("ask" if is_buy else "bid")
     slip = float(sizing["max_slippage_pct"]) / 100.0
     warnings: List[Dict[str, str]] = []
 
@@ -89,7 +96,12 @@ def build_ticket(
         elif adverse < -0.5:
             warn("info", f"Preço atual {abs(drift_pct):.1f}% melhor que a entrada do analista.")
     elif current is None:
-        warn("info", "Sem cotação atual do TradingFloors — confira o preço no Home Broker antes de enviar.")
+        warn("info", "Sem cotação atual — confira o preço no Home Broker antes de enviar.")
+    if signal.get("quote_fallback"):
+        warn("warning", f"{signal['quote_fallback']} — usando o preço do TradingFloors (atraso desconhecido). Confira no Home Broker.")
+    elif quote and not quote.get("realtime"):
+        qt = to_brt(quote.get("time") or quote.get("at"))
+        warn("info", f"Cotação da {quote.get('source')}{qt.strftime(' das %H:%M') if qt else ''} (atualiza a cada ~30 min) — confira no Home Broker.")
 
     # ---------------- quantidade
     lot = 1 if asset in ("FUTURO", "FOREX", "INDICE", "COMMODITY", "CRIPTO") else int(sizing.get("lot_step") or b3_tickers.default_lot(asset))
@@ -167,6 +179,8 @@ def build_ticket(
         "side_label": "COMPRA" if is_buy else "VENDA",
         "entry_price": entry or None,
         "current_price": current,
+        "price_basis": basis,
+        "quote": quote,
         "drift_pct": drift_pct,
         "limit_price": limit,
         "worst_price": worst,
@@ -221,8 +235,11 @@ def exit_ticket(position: Dict[str, Any], signal: Optional[Dict[str, Any]], pref
     qty = abs(float(position["qty"]))
     side = "SELL" if position["side"] == "LONG" else "BUY"
     ref = None
+    book = position.get("last_bid") if side == "SELL" else position.get("last_ask")
     if signal and signal.get("preco_saida"):
         ref = float(signal["preco_saida"])
+    elif book and position.get("quote_live"):
+        ref = float(book)
     elif position.get("last_price") is not None:
         ref = float(position["last_price"])
     gross = round(qty * ref, 2) if ref else None

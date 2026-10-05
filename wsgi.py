@@ -1,9 +1,9 @@
 """
 Ponto de entrada WSGI (Docker/gunicorn):
 
-    gunicorn -w 1 --threads 8 -b 0.0.0.0:5000 wsgi:app
+    gunicorn -w 1 --threads 16 -b 0.0.0.0:5000 wsgi:app
 
-Use UM worker: o monitor de sinais roda como thread dentro do processo.
+Use UM worker: o monitor de sinais e o feed de cotações rodam como threads dentro do processo.
 """
 import logging
 import os

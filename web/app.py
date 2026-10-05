@@ -37,11 +37,12 @@ def create_app(start_monitor: bool = True, db_path=None) -> Flask:
     from web.api.notes_api import bp as notes_bp
     from web.api.lab_api import bp as lab_bp
     from web.api.portfolio_api import bp as portfolio_bp
+    from web.api.quotes_api import bp as quotes_bp
     from web.api.results_api import bp as results_bp
     from web.api.settings_api import bp as settings_bp
     from web.api.signals_api import bp as signals_bp
 
-    for bp in (core_bp, signals_bp, portfolio_bp, alerts_bp, settings_bp, results_bp, lab_bp, execution_bp, notes_bp):
+    for bp in (core_bp, signals_bp, portfolio_bp, alerts_bp, settings_bp, results_bp, lab_bp, execution_bp, notes_bp, quotes_bp):
         app.register_blueprint(bp)
 
     @app.errorhandler(ValueError)
@@ -57,9 +58,11 @@ def create_app(start_monitor: bool = True, db_path=None) -> Flask:
         return render_template("app.html", version=__version__)
 
     if start_monitor:
+        from src.services.quotes import get_feed
         from src.services.signal_monitor import get_monitor
 
         get_monitor().start()
+        get_feed().start()
 
     return app
 

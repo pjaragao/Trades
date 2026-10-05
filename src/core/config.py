@@ -150,6 +150,51 @@ def execution_flags() -> Dict[str, Any]:
     }
 
 
+def market_data_flags() -> Dict[str, Any]:
+    """
+    Fontes das cotações ao vivo (independem do modo de execução — só leitura):
+    - mt5   : terminal MetaTrader 5 da corretora (tempo real, bid/ask; agente com URL+token ou EXECUTION_BROKER=mt5_local);
+    - brapi : brapi.dev para ações (BRAPI_TOKEN; plano gratuito: 1 ativo/requisição, 15.000 req em 30 dias);
+    - TradingFloors (opções dos sinais) e o preço manual são sempre a reserva.
+    QUOTES_PROVIDER: auto (usa o que estiver configurado) | mt5 | brapi | off.
+    """
+    load_env()
+    md = load_yaml().get("market_data", {}) or {}
+    ex = execution_flags()
+    choice = (os.getenv("QUOTES_PROVIDER") or md.get("provider") or "auto").strip().lower()
+    brapi_token = (os.getenv("BRAPI_TOKEN") or md.get("brapi_token") or "").strip()
+    if ex["broker"] == "mt5_local":
+        import importlib.util
+
+        mt5_ready = importlib.util.find_spec("MetaTrader5") is not None  # só no Windows, com o pacote instalado
+    else:
+        mt5_ready = bool(ex["mt5_agent_url"] and ex["mt5_agent_token"])
+    use_mt5 = mt5_ready and choice in ("auto", "mt5")
+    use_brapi = bool(brapi_token) and choice in ("auto", "brapi")
+
+    def _num(env: str, key: str, default: float) -> float:
+        try:
+            return float(os.getenv(env) or md.get(key) or default)
+        except (TypeError, ValueError):
+            return default
+
+    return {
+        "mt5": use_mt5,
+        "brapi": use_brapi,
+        "provider": "+".join(n for n, on in (("mt5", use_mt5), ("brapi", use_brapi)) if on) or "off",
+        "mt5_ready": mt5_ready,
+        "interval": max(0.5, _num("QUOTES_INTERVAL", "interval_seconds", 2)),
+        "closed_interval": max(30.0, _num("QUOTES_CLOSED_INTERVAL", "closed_interval_seconds", 300)),
+        "brapi_token": brapi_token,
+        # plano gratuito: 15.000 req numa janela móvel de 30 dias (~500/dia) -> 450/dia deixa 10% de folga
+        "brapi_daily_budget": int(_num("BRAPI_DAILY_BUDGET", "brapi_daily_budget", 450)),
+        # a brapi gratuita renova os dados a cada 30 min: consultar antes disso só gasta requisição
+        "brapi_min_interval": max(300.0, _num("BRAPI_MIN_INTERVAL", "brapi_min_interval_seconds", 1800)),
+        "brapi_reserve": int(_num("BRAPI_RESERVE", "brapi_reserve", 1000)),
+        "max_tickers": int(_num("QUOTES_MAX_TICKERS", "max_tickers", 60)),
+    }
+
+
 def telegram_credentials() -> Tuple[str, str]:
     load_env()
     return os.getenv("TELEGRAM_BOT_TOKEN", "").strip(), os.getenv("TELEGRAM_CHAT_ID", "").strip()
