@@ -1,0 +1,49 @@
+# Configurações Gerais do Módulo de Estratégias
+
+general:
+  base_dir: "strategies"
+  knowledge_base_dir: "strategies/knowledge_base"
+  cache_dir: "strategies/data_cache"
+
+screener:
+  default_tickers:
+    - "VALE3.SA"
+    - "PETR4.SA"
+    - "ITUB4.SA"
+    - "BBAS3.SA"
+    - "B3SA3.SA"
+    - "BOVA11.SA"
+  atr_period: 14
+  atr_multiplier: 1.0
+  min_liquidity_daily_volume: 50000000 # R$ 50M diários
+
+backtesting:
+  default_risk_free_annual_rate: 0.1175 # Selic/CDI ~11.75%
+  default_initial_capital: 100000.0
+  slippage_pct: 0.005 # 0.5%
+  b3_fees_per_trade: 5.0 # Custos B3 aproximados
+
+youtube_ingestion:
+  max_videos_per_channel: 50
+  preferred_languages:
+    - "pt"
+    - "en"
+  strategy_keywords:
+    - "estratégia"
+    - "estrategia"
+    - "opções"
+    - "opcoes"
+    - "venda de put"
+    - "put"
+    - "call"
+    - "trava"
+    - "swing trade"
+    - "day trade"
+    - "backtest"
+    - "cdi"
+    - "renda"
+    - "lucro"
+    - "setup"
+    - "indicador"
+    - "atr"
+    - "volatilidade"

@@ -1,0 +1,441 @@
+{
+  "analyzed_at": "2026-09-14T10:26:52.366996",
+  "total_closed_trades": 2240,
+  "traders": [
+    {
+      "trader": "Brondi",
+      "total_trades": 666,
+      "win_count": 223,
+      "loss_count": 189,
+      "win_rate_pct": 33.48,
+      "payoff_ratio": 1.13,
+      "profit_factor": 1.34,
+      "total_pnl": 3942.96,
+      "expectancy_per_trade": 5.92,
+      "avg_win": 70.3,
+      "avg_loss": 62.08,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 507,
+        "WDOFUT": 108,
+        "WSPFUT": 51
+      },
+      "top_produtos": {
+        "Trading Floor": 655,
+        "Desafio Eleições / Opções": 11
+      }
+    },
+    {
+      "trader": "Calvete",
+      "total_trades": 499,
+      "win_count": 236,
+      "loss_count": 87,
+      "win_rate_pct": 47.29,
+      "payoff_ratio": 0.74,
+      "profit_factor": 2.0,
+      "total_pnl": 7952.79,
+      "expectancy_per_trade": 15.94,
+      "avg_win": 67.25,
+      "avg_loss": 91.02,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 491,
+        "BRKMU940": 1,
+        "UGPAU205": 1
+      },
+      "top_produtos": {
+        "Trading Floor": 481,
+        "Desafio Eleições / Opções": 10
+      }
+    },
+    {
+      "trader": "Alexandre",
+      "total_trades": 205,
+      "win_count": 62,
+      "loss_count": 105,
+      "win_rate_pct": 30.24,
+      "payoff_ratio": 1.83,
+      "profit_factor": 1.08,
+      "total_pnl": 371.29,
+      "expectancy_per_trade": 1.81,
+      "avg_win": 80.51,
+      "avg_loss": 44.0,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 159,
+        "WDOFUT": 42,
+        "WSPFUT": 3
+      },
+      "top_produtos": {
+        "Trading Floor": 198,
+        "Desafio Eleições / Opções": 7
+      }
+    },
+    {
+      "trader": "Sanita",
+      "total_trades": 195,
+      "win_count": 118,
+      "loss_count": 25,
+      "win_rate_pct": 60.51,
+      "payoff_ratio": 1.39,
+      "profit_factor": 6.56,
+      "total_pnl": 27864.84,
+      "expectancy_per_trade": 142.9,
+      "avg_win": 278.64,
+      "avg_loss": 200.57,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "XAUUSD": 64,
+        "BTCUSD": 26,
+        "SP500FT": 11
+      },
+      "top_produtos": {
+        "Trading Floor": 132,
+        "Desafio Eleições / Opções": 42
+      }
+    },
+    {
+      "trader": "Amilton",
+      "total_trades": 137,
+      "win_count": 89,
+      "loss_count": 41,
+      "win_rate_pct": 64.96,
+      "payoff_ratio": 1.24,
+      "profit_factor": 2.68,
+      "total_pnl": 1741.0,
+      "expectancy_per_trade": 12.71,
+      "avg_win": 31.18,
+      "avg_loss": 25.22,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 44,
+        "PETR4": 5,
+        "AXIA3": 3
+      },
+      "top_produtos": {
+        "Trading Floor": 134,
+        "Desafio Eleições / Opções": 3
+      }
+    },
+    {
+      "trader": "Pedro Prado",
+      "total_trades": 119,
+      "win_count": 27,
+      "loss_count": 34,
+      "win_rate_pct": 22.69,
+      "payoff_ratio": 3.97,
+      "profit_factor": 3.16,
+      "total_pnl": 811.04,
+      "expectancy_per_trade": 6.82,
+      "avg_win": 43.97,
+      "avg_loss": 11.07,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "SP500FT": 33,
+        "EURUSD": 22,
+        "NAS100FT": 18
+      },
+      "top_produtos": {
+        "Trading Floor": 118,
+        "Desafio Eleições / Opções": 1
+      }
+    },
+    {
+      "trader": "Guilherme",
+      "total_trades": 105,
+      "win_count": 76,
+      "loss_count": 14,
+      "win_rate_pct": 72.38,
+      "payoff_ratio": 1.0,
+      "profit_factor": 5.41,
+      "total_pnl": 3374.11,
+      "expectancy_per_trade": 32.13,
+      "avg_win": 54.46,
+      "avg_loss": 54.64,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WDOFUT": 90,
+        "WINFUT": 15
+      },
+      "top_produtos": {
+        "Trading Floor": 104,
+        "Desafio Eleições / Opções": 1
+      }
+    },
+    {
+      "trader": "Artur Horta",
+      "total_trades": 74,
+      "win_count": 41,
+      "loss_count": 23,
+      "win_rate_pct": 55.41,
+      "payoff_ratio": 0.83,
+      "profit_factor": 1.48,
+      "total_pnl": 5975.59,
+      "expectancy_per_trade": 80.75,
+      "avg_win": 446.26,
+      "avg_loss": 535.71,
+      "median_duration_min": 6480.0,
+      "top_tickers": {
+        "VAMO3": 3,
+        "BBDC4": 3,
+        "TEND3": 2
+      },
+      "top_produtos": {
+        "Trading Floor": 42,
+        "Opções": 23
+      }
+    },
+    {
+      "trader": "Felipe Corleta",
+      "total_trades": 52,
+      "win_count": 34,
+      "loss_count": 9,
+      "win_rate_pct": 65.38,
+      "payoff_ratio": 0.46,
+      "profit_factor": 1.73,
+      "total_pnl": 1235.46,
+      "expectancy_per_trade": 23.76,
+      "avg_win": 85.93,
+      "avg_loss": 187.35,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 37,
+        "WDOFUT": 5,
+        "VALE3": 2
+      },
+      "top_produtos": {
+        "Trading Floor": 50,
+        "Desafio Eleições / Opções": 1
+      }
+    },
+    {
+      "trader": "Guto",
+      "total_trades": 52,
+      "win_count": 25,
+      "loss_count": 22,
+      "win_rate_pct": 48.08,
+      "payoff_ratio": 1.04,
+      "profit_factor": 1.18,
+      "total_pnl": 296.6,
+      "expectancy_per_trade": 5.7,
+      "avg_win": 78.26,
+      "avg_loss": 75.45,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 51,
+        "WDOFUT": 1
+      },
+      "top_produtos": {
+        "Trading Floor": 52
+      }
+    },
+    {
+      "trader": "Luis Fontes",
+      "total_trades": 51,
+      "win_count": 24,
+      "loss_count": 15,
+      "win_rate_pct": 47.06,
+      "payoff_ratio": 0.91,
+      "profit_factor": 1.45,
+      "total_pnl": 335.54,
+      "expectancy_per_trade": 6.58,
+      "avg_win": 45.09,
+      "avg_loss": 49.78,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 35,
+        "XAUUSD": 9,
+        "BITQ26": 3
+      },
+      "top_produtos": {
+        "Trading Floor": 50,
+        "Desafio Eleições / Opções": 1
+      }
+    },
+    {
+      "trader": "Saviola",
+      "total_trades": 24,
+      "win_count": 5,
+      "loss_count": 7,
+      "win_rate_pct": 20.83,
+      "payoff_ratio": 1.45,
+      "profit_factor": 1.04,
+      "total_pnl": 18.2,
+      "expectancy_per_trade": 0.76,
+      "avg_win": 96.8,
+      "avg_loss": 66.54,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "WINFUT": 17,
+        "SP500FT": 3,
+        "WDOFUT": 3
+      },
+      "top_produtos": {
+        "Trading Floor": 23,
+        "Desafio Eleições / Opções": 1
+      }
+    },
+    {
+      "trader": "Wanderson Assis",
+      "total_trades": 16,
+      "win_count": 7,
+      "loss_count": 3,
+      "win_rate_pct": 43.75,
+      "payoff_ratio": 2.25,
+      "profit_factor": 5.25,
+      "total_pnl": 370.0,
+      "expectancy_per_trade": 23.13,
+      "avg_win": 65.29,
+      "avg_loss": 29.0,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "SBSP3": 2,
+        "RECV3": 2,
+        "IRBR3": 2
+      },
+      "top_produtos": {
+        "Trading Floor": 16
+      }
+    },
+    {
+      "trader": "Ferri",
+      "total_trades": 15,
+      "win_count": 14,
+      "loss_count": 1,
+      "win_rate_pct": 93.33,
+      "payoff_ratio": 1.14,
+      "profit_factor": 15.93,
+      "total_pnl": 24455.0,
+      "expectancy_per_trade": 1630.33,
+      "avg_win": 1863.79,
+      "avg_loss": 1638.0,
+      "median_duration_min": 11520.0,
+      "top_tickers": {
+        "BBDCU201": 2,
+        "MGLUI450": 2,
+        "BPACT600": 1
+      },
+      "top_produtos": {
+        "Desafio Eleições / Opções": 14,
+        "Opções": 1
+      }
+    },
+    {
+      "trader": "Ademar",
+      "total_trades": 12,
+      "win_count": 1,
+      "loss_count": 1,
+      "win_rate_pct": 8.33,
+      "payoff_ratio": 0.2,
+      "profit_factor": 0.2,
+      "total_pnl": -0.04,
+      "expectancy_per_trade": -0.0,
+      "avg_win": 0.01,
+      "avg_loss": 0.05,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "USDCAD": 4,
+        "CADUSD": 3,
+        "GBPUSD": 3
+      },
+      "top_produtos": {
+        "Trading Floor": 11,
+        "Desafio Eleições / Opções": 1
+      }
+    },
+    {
+      "trader": "Leon Suhett",
+      "total_trades": 12,
+      "win_count": 1,
+      "loss_count": 0,
+      "win_rate_pct": 8.33,
+      "payoff_ratio": 0.0,
+      "profit_factor": 99.0,
+      "total_pnl": 91.0,
+      "expectancy_per_trade": 7.58,
+      "avg_win": 91.0,
+      "avg_loss": 0.0,
+      "median_duration_min": 0.0,
+      "top_tickers": {
+        "EURUSD": 3,
+        "GBPUSD": 2,
+        "USDCHF": 2
+      },
+      "top_produtos": {
+        "Trading Floor": 12
+      }
+    },
+    {
+      "trader": "Relatórios",
+      "total_trades": 6,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate_pct": 0.0,
+      "payoff_ratio": 0.0,
+      "profit_factor": 0.0,
+      "total_pnl": 0.0,
+      "expectancy_per_trade": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "median_duration_min": 10080.0,
+      "top_tickers": {
+        "ROXO34": 1,
+        "C2RW34": 1,
+        "PSSA3": 1
+      },
+      "top_produtos": {
+        "Trading Floor": 6
+      }
+    }
+  ],
+  "assets": {
+    "Ações/FIIs/BDRs (B3)": {
+      "total_trades": 176,
+      "win_rate_pct": 53.41,
+      "total_pnl": 2092.0,
+      "avg_pnl_per_trade": 11.89
+    },
+    "Commodities": {
+      "total_trades": 80,
+      "win_rate_pct": 43.75,
+      "total_pnl": 454.58,
+      "avg_pnl_per_trade": 5.75
+    },
+    "Cripto": {
+      "total_trades": 28,
+      "win_rate_pct": 50.0,
+      "total_pnl": 45.28,
+      "avg_pnl_per_trade": 1.62
+    },
+    "Forex": {
+      "total_trades": 88,
+      "win_rate_pct": 10.23,
+      "total_pnl": 821.01,
+      "avg_pnl_per_trade": 9.33
+    },
+    "Futuros (B3)": {
+      "total_trades": 1670,
+      "win_rate_pct": 42.4,
+      "total_pnl": 21245.44,
+      "avg_pnl_per_trade": 12.73
+    },
+    "Não Identificado/Fora da Regra": {
+      "total_trades": 2,
+      "win_rate_pct": 0.0,
+      "total_pnl": 0.0,
+      "avg_pnl_per_trade": NaN
+    },
+    "OPCOES": {
+      "total_trades": 118,
+      "win_rate_pct": 79.66,
+      "total_pnl": 53119.14,
+      "avg_pnl_per_trade": 450.16
+    },
+    "Índices/CFDs": {
+      "total_trades": 78,
+      "win_rate_pct": 37.18,
+      "total_pnl": 1057.93,
+      "avg_pnl_per_trade": 13.56
+    }
+  }
+}

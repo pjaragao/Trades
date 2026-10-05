@@ -1,0 +1,30 @@
+app:
+  name: TradingFloors MT5 Copier
+  version: 1.0.0
+execution:
+  # Fase manual: execução automática no MT5 DESLIGADA. Só ligue na Fase 6.
+  enabled: false
+  dry_run: true
+  initial_sync_mode: only_new
+  poll_interval_seconds: 5
+mt5:
+  deviation_points: 10
+  magic_number: 998877
+  order_type: limit
+  terminal_path: ''
+risk:
+  enforce_market_hours: false
+  fixed_capital_per_trade: 1000.0
+  fixed_quantity: 100
+  max_open_positions: 10
+  max_slippage_pct: 5.0
+  options_lot_step: 100
+  sizing_mode: fixed_capital
+trading_floors:
+  allowed_products:
+  - Trading Floor
+  - Desafio Eleições
+  - Opções
+  allowed_traders: []
+  supabase_anon_key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5dnF0ZmZwZm1mZXNjeHpxaWZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NTg1NDgsImV4cCI6MjEwMTMzNDU0OH0.-Hg2FQILqSSeWSRCYHKOUaBClP6ftMifVVOWD3OpLkA
+  supabase_url: https://ayvqtffpfmfescxzqifp.supabase.co

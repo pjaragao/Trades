@@ -1,0 +1,346 @@
+{
+  "updated_at": "2026-09-12T10:44:30",
+  "total_strategies": 17,
+  "sources": [
+    "YouTube",
+    "TradingFloor"
+  ],
+  "strategies": [
+    {
+      "id": "STRAT-YT-001",
+      "name": "Venda de Put OTM no Nível -1 ATR (Renda 300% CDI)",
+      "source": "YouTube (Jimmy Carvalho)",
+      "asset_class": "Opções (Puts B3)",
+      "symbols": [
+        "VALE3",
+        "PETR4",
+        "ITUB4",
+        "BBAS3",
+        "B3SA3"
+      ],
+      "win_rate_pct": 99.0,
+      "payoff_ratio": 0.45,
+      "profit_factor": 4.8,
+      "max_drawdown_pct": 18.2,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-001_venda_put_300cdi.md",
+      "has_live_screener": true,
+      "summary": "Venda coberta por garantia no CDI de Puts com strike 1 ATR abaixo do preço. Gera de 200% a 400% do CDI com taxa de acerto entre 95% e 99%.",
+      "screener_type": "put_selling"
+    },
+    {
+      "id": "STRAT-YT-002",
+      "name": "Trava de Alta com Call (Bull Call Spread - Alvo 2x a 3x)",
+      "source": "YouTube (Jimmy Carvalho)",
+      "asset_class": "Opções (Calls B3)",
+      "symbols": [
+        "VALE3",
+        "PETR4",
+        "BBAS3",
+        "BOVA11"
+      ],
+      "win_rate_pct": 52.0,
+      "payoff_ratio": 2.6,
+      "profit_factor": 2.8,
+      "max_drawdown_pct": 10.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-002_trava_alta_bull_spread.md",
+      "has_live_screener": true,
+      "summary": "Estrutura direcional a débito com risco delimitado, comprando Call ATM e vendendo Call OTM em resistência para multiplicar o capital em 2x a 3x.",
+      "screener_type": "bull_spread"
+    },
+    {
+      "id": "STRAT-YT-003",
+      "name": "Swing Trade de Alta Consistência (72% de Acerto)",
+      "source": "YouTube (Jimmy Carvalho & Rodrigo APMC)",
+      "asset_class": "Ações B3 (À Vista)",
+      "symbols": [
+        "Ações Líquidas B3"
+      ],
+      "win_rate_pct": 72.0,
+      "payoff_ratio": 1.15,
+      "profit_factor": 2.95,
+      "max_drawdown_pct": 9.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-003_swing_trade_72pct_acerto.md",
+      "has_live_screener": true,
+      "summary": "+900 operações auditadas no APMC, 72% de win rate, giro ágil de 2 a 8 dias com alvos de 3% a 5% e rigorosa disciplina de stop.",
+      "screener_type": "swing_trade"
+    },
+    {
+      "id": "STRAT-YT-004",
+      "name": "Renda Mensal com Venda Coberta & Cash-Secured Put",
+      "source": "YouTube (Jimmy Carvalho)",
+      "asset_class": "Opções B3 (Calls & Puts)",
+      "symbols": [
+        "PETR4",
+        "VALE3",
+        "BBAS3",
+        "ITUB4"
+      ],
+      "win_rate_pct": 88.0,
+      "payoff_ratio": 0.8,
+      "profit_factor": 3.2,
+      "max_drawdown_pct": 14.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-004_renda_mensal_venda_coberta.md",
+      "has_live_screener": true,
+      "summary": "Geração contínua de dividendos sintéticos mensais (1.5% a 3% ao mês) combinando venda de Puts e venda coberta de Calls.",
+      "screener_type": "covered_call"
+    },
+    {
+      "id": "STRAT-YT-005",
+      "name": "Rastreamento de Fluxo Institucional em Opções",
+      "source": "YouTube (Jimmy Carvalho)",
+      "asset_class": "Opções Blue Chips B3",
+      "symbols": [
+        "BOVA11",
+        "PETR4",
+        "VALE3"
+      ],
+      "win_rate_pct": 58.0,
+      "payoff_ratio": 2.2,
+      "profit_factor": 3.0,
+      "max_drawdown_pct": 12.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-005_fluxo_institucional_calls.md",
+      "has_live_screener": false,
+      "summary": "Detecção de anomalias de volume e compras massivas de Calls por investidores estrangeiros para replicar em travas com risco travado."
+    },
+    {
+      "id": "STRAT-YT-006",
+      "name": "Protocolo de Auditoria e Backtesting de Opções",
+      "source": "YouTube (Jimmy Carvalho)",
+      "asset_class": "Metodologia & Derivativos",
+      "symbols": [
+        "B3 Geral"
+      ],
+      "win_rate_pct": 0.0,
+      "payoff_ratio": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-006_auditoria_backtest_opcoes.md",
+      "has_live_screener": false,
+      "summary": "Framework em 4 etapas para auditar promessas, stress testing de Black Swans e cálculo de expectativa matemática real pós-taxas B3."
+    },
+    {
+      "id": "STRAT-YT-007",
+      "name": "Alocação Híbrida de R$ 100k com Dividendos Sintéticos",
+      "source": "YouTube (Jimmy Carvalho)",
+      "asset_class": "Multi-Ativos (Renda Fixa + Ações + Opções)",
+      "symbols": [
+        "LFTS11",
+        "BBAS3",
+        "ITUB4",
+        "CPLE6"
+      ],
+      "win_rate_pct": 92.0,
+      "payoff_ratio": 0.9,
+      "profit_factor": 4.1,
+      "max_drawdown_pct": 7.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/youtube/jimmy_carvalho/STRAT-YT-007_alocacao_100k_dividendos_sinteticos.md",
+      "has_live_screener": true,
+      "summary": "Estrutura patrimonial alocando R$ 100k (60% CDI, 30% ações dividendistas, 10% derivativos) para gerar R$ 2.000 a R$ 3.000 por mês.",
+      "screener_type": "portfolio_allocator"
+    },
+    {
+      "id": "STRAT-TF-004",
+      "name": "Opções Estruturadas de Alta Assimetria (93.1% Win Rate)",
+      "source": "TradingFloor (Ferri)",
+      "asset_class": "Opções B3 (Calls & Puts)",
+      "symbols": [
+        "BBDCU201",
+        "MGLUI450",
+        "BPACT600",
+        "PETR4"
+      ],
+      "win_rate_pct": 93.1,
+      "payoff_ratio": 2.4,
+      "profit_factor": 14.5,
+      "max_drawdown_pct": 4.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-004_ferri_opcoes_assimetria.md",
+      "has_live_screener": true,
+      "summary": "Maior taxa de acerto do TradingFloor (93.1%). Lucro de +R$ 46.648,00 em 29 operações de opções com média de R$ 1.765 por ganho.",
+      "screener_type": "bull_spread"
+    },
+    {
+      "id": "STRAT-TF-003",
+      "name": "Tendência & Rompimento Direcional (PnL +R$ 54k)",
+      "source": "TradingFloor (Sanita)",
+      "asset_class": "Futuros B3, Opções & Commodities",
+      "symbols": [
+        "XAUUSD",
+        "BTCUSD",
+        "SP500FT",
+        "WINFUT"
+      ],
+      "win_rate_pct": 66.95,
+      "payoff_ratio": 1.31,
+      "profit_factor": 7.78,
+      "max_drawdown_pct": 6.2,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-003_sanita_trend_breakout.md",
+      "has_live_screener": true,
+      "summary": "Maior lucro absoluto da plataforma (+R$ 54.714,84 em 239 trades), Win Rate de 67% e Profit Factor 7.78 operando Ouro, Cripto e Opções.",
+      "screener_type": "swing_trade"
+    },
+    {
+      "id": "STRAT-TF-002",
+      "name": "Níveis & Pullback em Mini-Índice B3",
+      "source": "TradingFloor (Calvete)",
+      "asset_class": "Futuros B3 (WINFUT)",
+      "symbols": [
+        "WINFUT"
+      ],
+      "win_rate_pct": 46.86,
+      "payoff_ratio": 0.74,
+      "profit_factor": 1.97,
+      "max_drawdown_pct": 11.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-002_calvete_winfut_levels.md",
+      "has_live_screener": true,
+      "summary": "510 operações em mini-índice, lucro de +R$ 7.882,79, operando suporte/resistência com saídas parciais rápidas.",
+      "screener_type": "futures_levels"
+    },
+    {
+      "id": "STRAT-TF-005",
+      "name": "Swing Trade em Ações & Opções de Small Caps",
+      "source": "TradingFloor (Artur Horta)",
+      "asset_class": "Ações B3 & Opções",
+      "symbols": [
+        "VAMO3",
+        "COGN3",
+        "NATU3",
+        "CAML3"
+      ],
+      "win_rate_pct": 57.6,
+      "payoff_ratio": 1.35,
+      "profit_factor": 2.1,
+      "max_drawdown_pct": 8.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-005_artur_horta_swing_opcoes.md",
+      "has_live_screener": true,
+      "summary": "92 operações em Small Caps e opções, lucro de +R$ 7.694,26 com 58% de taxa de acerto e foco em divergências de IFR.",
+      "screener_type": "swing_trade"
+    },
+    {
+      "id": "STRAT-TF-006",
+      "name": "Especialista em Mini-Dólar Futuro (72.6% Win Rate)",
+      "source": "TradingFloor (Guilherme)",
+      "asset_class": "Futuros B3 (WDOFUT)",
+      "symbols": [
+        "WDOFUT"
+      ],
+      "win_rate_pct": 72.6,
+      "payoff_ratio": 0.65,
+      "profit_factor": 1.85,
+      "max_drawdown_pct": 5.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-006_guilherme_wdofut_scalp.md",
+      "has_live_screener": true,
+      "summary": "109 operações focadas no mini-dólar futuro com 72.6% de acerto e lucro de +R$ 3.384,11 explorando fluxo cambial intraday.",
+      "screener_type": "futures_levels"
+    },
+    {
+      "id": "STRAT-TF-007",
+      "name": "Operações Mistas de Ações & Futuros B3",
+      "source": "TradingFloor (Amilton)",
+      "asset_class": "Ações B3 & Futuros",
+      "symbols": [
+        "PETR4",
+        "AXIA3",
+        "WINFUT"
+      ],
+      "win_rate_pct": 66.0,
+      "payoff_ratio": 0.85,
+      "profit_factor": 1.75,
+      "max_drawdown_pct": 6.8,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-007_amilton_acoes_swing.md",
+      "has_live_screener": true,
+      "summary": "142 operações divididas entre ações sólidas e mini-índice, com 66% de taxa de acerto e lucro consistente de +R$ 1.898,00.",
+      "screener_type": "swing_trade"
+    },
+    {
+      "id": "STRAT-TF-001",
+      "name": "Scalping Direcional de Alta Frequência em Mini-Índice",
+      "source": "TradingFloor (Brondi)",
+      "asset_class": "Futuros B3 (WINFUT)",
+      "symbols": [
+        "WINFUT",
+        "WDOFUT",
+        "WSPFUT"
+      ],
+      "win_rate_pct": 33.7,
+      "payoff_ratio": 1.13,
+      "profit_factor": 1.35,
+      "max_drawdown_pct": 8.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-001_brondi_winfut_scalp.md",
+      "has_live_screener": true,
+      "summary": "677 operações rápidas de scalping no book de mini-índice futuro com alvos curtos de 80 a 150 pontos (+R$ 4.143,96 de lucro).",
+      "screener_type": "futures_levels"
+    },
+    {
+      "id": "STRAT-TF-009",
+      "name": "Operações Direcionais em WINFUT & Blue Chips",
+      "source": "TradingFloor (Felipe Corleta)",
+      "asset_class": "Futuros B3 & Ações",
+      "symbols": [
+        "WINFUT",
+        "WDOFUT",
+        "VALE3"
+      ],
+      "win_rate_pct": 64.2,
+      "payoff_ratio": 0.9,
+      "profit_factor": 1.65,
+      "max_drawdown_pct": 5.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-009_felipe_corleta_direcional.md",
+      "has_live_screener": true,
+      "summary": "53 operações direcionais com 64.2% de acerto (+R$ 1.235,46) a favor da média de 20 períodos em mini-índice e VALE3.",
+      "screener_type": "swing_trade"
+    },
+    {
+      "id": "STRAT-TF-008",
+      "name": "Macro Global em Índices dos EUA & Forex",
+      "source": "TradingFloor (Pedro Prado)",
+      "asset_class": "Forex & Índices Globais",
+      "symbols": [
+        "SP500FT",
+        "NAS100FT",
+        "EURUSD"
+      ],
+      "win_rate_pct": 22.5,
+      "payoff_ratio": 3.8,
+      "profit_factor": 1.2,
+      "max_drawdown_pct": 9.0,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-008_pedro_prado_macro_indices.md",
+      "has_live_screener": false,
+      "summary": "121 operações operando catalisadores macroeconômicos em S&P 500 futuro, Nasdaq e EURUSD com alta assimetria de retorno."
+    },
+    {
+      "id": "STRAT-TF-010",
+      "name": "Operações de Volume em Mini-Índice & Dólar",
+      "source": "TradingFloor (Alexandre)",
+      "asset_class": "Futuros B3 (WINFUT / WDOFUT)",
+      "symbols": [
+        "WINFUT",
+        "WDOFUT"
+      ],
+      "win_rate_pct": 30.5,
+      "payoff_ratio": 1.25,
+      "profit_factor": 1.15,
+      "max_drawdown_pct": 7.5,
+      "status": "ACTIVE",
+      "doc_path": "strategies/knowledge_base/trading_floor/setups/STRAT-TF-010_alexandre_winfut_volume.md",
+      "has_live_screener": true,
+      "summary": "214 operações explorando grandes blocos de agressão no livro de ofertas de futuros da B3.",
+      "screener_type": "futures_levels"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "channel_id": "UCSD7SH09s-rmWrhPc-Lpc0w",
+  "channel_name": "Jimmy Carvalho",
+  "channel_url": "https://www.youtube.com/channel/UCSD7SH09s-rmWrhPc-Lpc0w",
+  "last_updated": "2026-09-12T10:20:00",
+  "total_videos_analyzed": 10,
+  "specialties": [
+    "Venda de Puts OTM com ATR",
+    "Geração de Renda Mensal com Opções",
+    "Trava de Alta / Bull Call Spread",
+    "Swing Trade Quantitativo",
+    "Rastreamento de Fluxo Institucional",
+    "Auditoria e Backtesting de Opções"
+  ],
+  "cataloged_strategies": [
+    {
+      "strategy_id": "STRAT-YT-001",
+      "video_id": "L48NBs21q6g",
+      "title": "DESCOBRI UMA ESTRATÉGIA QUE RENDE 300% O CDI",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-001_venda_put_300cdi.md",
+      "summary": "Venda de Put OTM no nível de -1 ATR em VALE3/PETR4 com 100% de garantia no CDI. 99% de acerto histórico e 20.8x o capital inicial em 17 anos."
+    },
+    {
+      "strategy_id": "STRAT-YT-002",
+      "video_id": "TeKdmKI7EYE",
+      "title": "HOW TO 3X YOUR MONEY IN THE STOCK MARKET (STRATEGY: BULL SPREAD)",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-002_trava_alta_bull_spread.md",
+      "summary": "Trava de Alta com Call (Bull Spread) direcional de risco pré-fixado, buscando ganho de 2x a 3x o valor investido com movimentos curtos de alta."
+    },
+    {
+      "strategy_id": "STRAT-YT-003",
+      "video_id": "jPmAlG1oNmA",
+      "title": "Swing trade: por que ele acerta 72% quando a ELITE faz 55%?",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-003_swing_trade_72pct_acerto.md",
+      "summary": "Setup do trader Rodrigo com +900 operações auditadas no APMC, 72% de taxa de acerto, ganho médio de 3.4% por trade e retorno acumulado de +3.000%."
+    },
+    {
+      "strategy_id": "STRAT-YT-004",
+      "video_id": "ohVQe64IZak",
+      "title": "Renda Mensal Com OPÇÕES de forma Rápida Guia Completo para Iniciantes",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-004_renda_mensal_venda_coberta.md",
+      "summary": "Metodologia de Venda Coberta de Call e Cash-Secured Put para geração contínua de fluxo de caixa (dividendos sintéticos de 1.5% a 3% ao mês)."
+    },
+    {
+      "strategy_id": "STRAT-YT-005",
+      "video_id": "UpqUy3xjp2Q",
+      "title": "A APOSTA DE 5.2 MILHÕES DE CALLS DOS GRINGOS NO BRASIL",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-005_fluxo_institucional_calls.md",
+      "summary": "Estratégia de rastreamento de Big Trades e anomalias de volume institucional estrangeiro em opções na B3."
+    },
+    {
+      "strategy_id": "STRAT-YT-006",
+      "video_id": "0NciLs5l7jY",
+      "title": "MELHOR MANEIRA DE SABER SE UMA ESTRATÉGIA DE OPÇÕES FUNCIONA!",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-006_auditoria_backtest_opcoes.md",
+      "summary": "Protocolo quantitativo em 4 etapas para desmascarar promessas, mapear risco de cauda e auditar robustez paramétrica de opções."
+    },
+    {
+      "strategy_id": "STRAT-YT-007",
+      "video_id": "22u2bqQClKA",
+      "title": "COMO EU TRANSFORMARIA R$ 100 MIL EM RENDA MENSAL",
+      "status": "CATALOGED",
+      "doc_file": "STRAT-YT-007_alocacao_100k_dividendos_sinteticos.md",
+      "summary": "Carteira de renda passiva alocando R$ 100k entre CDI garantidor, ações resilientes e opções gerando R$ 2k a R$ 3k/mês."
+    }
+  ],
+  "other_evaluated_videos": [
+    {
+      "video_id": "ZgB0ZePuhnI",
+      "title": "TESTEI NOVA IA COM R$ 50 MIL: DA CARTEIRA A OPÇÕES EM 3 CLIQUES",
+      "topic": "Ferramentas de IA para Derivativos",
+      "status": "EVALUATED"
+    },
+    {
+      "video_id": "OPGcNWw-hQs",
+      "title": "NOVAS OPÇÕES DE BDR NA B3: COMO OPERAR SPACEX, NUBANK E XP!",
+      "topic": "Mercado de BDRs e Opções com Formador de Mercado",
+      "status": "EVALUATED"
+    },
+    {
+      "video_id": "UclUXsACWIk",
+      "title": "MINHA PLATAFORMA REVOLUCIONÁRIA DE OPÇÕES E RECOMENDAÇÕES",
+      "topic": "Plataforma RCO Dash e Análise Gráfica de Opções",
+      "status": "EVALUATED"
+    }
+  ]
+}

@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradingFloors -> MetaTrader 5 Automation Suite</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>TradingFloors MT5</h1>
+        <span>Automation & Backtest Suite</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab-btn active" data-tab="dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        Dashboard
+      </button>
+      <button class="nav-tab-btn" data-tab="backtest">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+        Backtest Histórico
+      </button>
+      <button class="nav-tab-btn" data-tab="ai-forecast">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        Previsão IA (TimesFM)
+      </button>
+      <button class="nav-tab-btn" data-tab="strategies">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        Estratégias & Base de Conhecimento
+      </button>
+      <button class="nav-tab-btn" data-tab="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Configurações
+      </button>
+      <button class="nav-tab-btn" data-tab="logs">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        Logs & Terminal
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <div id="status-badge" class="status-badge stopped">
+        <span class="pulse-dot"></span>
+        <span id="status-text">ROBÔ PARADO</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- ========================================== -->
+    <!-- ABA 1: DASHBOARD & MONITOR AO VIVO         -->
+    <!-- ========================================== -->
+    <section id="pane-dashboard" class="tab-pane active">
+      
+      <!-- Metrics Grid -->
+      <div class="metrics-grid">
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Status do Robô</span>
+            <div class="card-icon">⚡</div>
+          </div>
+          <div id="dash-bot-status" class="card-value">PARADO</div>
+          <div id="dash-uptime" class="card-subtext">Uptime: 00:00:00</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Modo de Operação</span>
+            <div class="card-icon">🎯</div>
+          </div>
+          <div id="dash-mode-value" class="card-value cyan">SIMULAÇÃO</div>
+          <div class="card-subtext">Dry-Run (Sem risco de capital)</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Posições Acompanhadas</span>
+            <div class="card-icon">📊</div>
+          </div>
+          <div id="dash-open-count" class="card-value positive">0</div>
+          <div class="card-subtext">Posições sincronizadas ativas</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Conexão MetaTrader 5</span>
+            <div class="card-icon">🖥️</div>
+          </div>
+          <div id="dash-mt5-status" class="card-value">EM ESPERA</div>
+          <div id="dash-mt5-subtext" class="card-subtext">Simulado ou aguardando terminal</div>
+        </div>
+      </div>
+
+      <!-- Bot Control Bar -->
+      <div class="control-bar">
+        <div class="control-bar-info">
+          <div class="control-item">
+            <span class="control-item-label">Capital por Trade</span>
+            <span id="bar-capital" class="control-item-val">1.000,00</span>
+          </div>
+          <div class="control-item">
+            <span class="control-item-label">Intervalo de Verificação</span>
+            <span id="bar-interval" class="control-item-val">5 segundos</span>
+          </div>
+          <div class="control-item">
+            <span class="control-item-label">Produtos Ativos</span>
+            <span id="bar-products" class="control-item-val">Desafio Eleições, Opções</span>
+          </div>
+        </div>
+
+        <div class="control-actions">
+          <button id="btn-toggle-bot" class="btn btn-success" onclick="toggleBot()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Iniciar Robô
+          </button>
+          <button id="btn-toggle-mode" class="btn btn-secondary" onclick="toggleMode()">
+            Alternar p/ Modo Real
+          </button>
+          <button class="btn btn-secondary" onclick="refreshDashboard()" title="Atualizar dados agora">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sinais Ativos no TradingFloors -->
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Recomendações Abertas na Plataforma TradingFloors
+          </h2>
+          <span id="tf-trades-count" class="card-subtext">Carregando sinais...</span>
+        </div>
+        <!-- Filtros Rápidos por Produto / Ativo -->
+        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-secondary btn-sm tf-filter-btn active" onclick="filterOpenTradesByQuickPill('all', this)">Todos</button>
+          <button class="btn btn-secondary btn-sm tf-filter-btn" onclick="filterOpenTradesByQuickPill('Trading Floor', this)">Trading Floor (Futuros/Cripto)</button>
+          <button class="btn btn-secondary btn-sm tf-filter-btn" onclick="filterOpenTradesByQuickPill('Opções', this)">Opções B3</button>
+          <button class="btn btn-secondary btn-sm tf-filter-btn" onclick="filterOpenTradesByQuickPill('Desafio Eleições', this)">Desafio Eleições</button>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros Avançados -->
+      <div class="filter-toolbar" style="margin-top: 0.6rem; margin-bottom: 0.8rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; background: rgba(13, 20, 36, 0.65); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+        <div style="flex: 1.2; min-width: 170px;">
+          <input type="text" id="tf-filter-search" class="form-input" placeholder="🔍 Buscar Ticker ou Papel (ex: PETR, VALE, Sanita)..." style="padding: 0.35rem 0.65rem; font-size: 0.8rem; width: 100%;" oninput="applyAllOpenTradeFilters()">
+        </div>
+        <div style="min-width: 140px;">
+          <select id="tf-filter-trader" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; width: 100%;" onchange="applyAllOpenTradeFilters()">
+            <option value="all">Todos os Traders</option>
+          </select>
+        </div>
+        <div style="min-width: 135px;">
+          <select id="tf-filter-product" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; width: 100%;" onchange="applyAllOpenTradeFilters()">
+            <option value="all">Todos os Produtos</option>
+            <option value="Desafio Eleições">Desafio Eleições</option>
+            <option value="Opções">Opções B3</option>
+            <option value="Trading Floor">Trading Floor</option>
+          </select>
+        </div>
+        <div style="min-width: 115px;">
+          <select id="tf-filter-side" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; width: 100%;" onchange="applyAllOpenTradeFilters()">
+            <option value="all">Todos Lados</option>
+            <option value="BUY">COMPRA</option>
+            <option value="SELL">VENDA</option>
+          </select>
+        </div>
+        <div style="min-width: 115px;">
+          <select id="tf-filter-asset" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; width: 100%;" onchange="applyAllOpenTradeFilters()">
+            <option value="all">Todos Tipos</option>
+            <option value="OPCOES">Opções</option>
+            <option value="Futuros">Futuros (B3)</option>
+            <option value="Ações">Ações</option>
+            <option value="Cripto">Cripto</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="resetOpenTradeFilters()" title="Limpar todos os filtros" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-color: rgba(255,255,255,0.15);">
+          🔄 Limpar
+        </button>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Tipo</th>
+              <th>Trader</th>
+              <th>Ticker</th>
+              <th>Lado</th>
+              <th style="text-align: right;">Preço Entrada</th>
+              <th style="text-align: right;">Preço Atual</th>
+              <th style="text-align: right;">Qtd Sugerida</th>
+              <th style="text-align: right; color: var(--accent-positive);">Total Entrada</th>
+              <th style="text-align: right; color: var(--accent-cyan);" title="Valor financeiro total caso a opção vá para exercício (Strike x Qtd)">Notional (Exercício)</th>
+              <th>Horário</th>
+              <th style="text-align: center;">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-tf-trades">
+            <tr><td colspan="12" style="text-align: center; color: var(--text-muted);">Consultando API TradingFloors...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+
+      <!-- Posições Sincronizadas no SQLite / MT5 -->
+      <div class="section-header">
+        <h2 class="section-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          Posições Acompanhadas pelo Robô (Banco Local & MT5)
+        </h2>
+        <span id="local-trades-count" class="card-subtext">0 registradas</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Lado</th>
+              <th>Trader</th>
+              <th>Entrada Executada</th>
+              <th>Qtd Executada</th>
+              <th>Ticket MT5</th>
+              <th>Status</th>
+              <th>Saída</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-local-trades">
+            <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Nenhuma posição salva no banco local até o momento.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- ABA 2: BACKTEST HISTÓRICO & ANALYTICS      -->
+    <!-- ========================================== -->
+    <section id="pane-backtest" class="tab-pane">
+
+      <!-- Backtest Filter Toolbar -->
+      <div class="filter-toolbar">
+        <div class="form-group">
+          <label>Produto</label>
+          <select id="bt-product" class="form-select">
+            <option value="all">Todos os Produtos</option>
+            <option value="Desafio Eleições" selected>Desafio Eleições (Opções)</option>
+            <option value="Opções">Opções B3</option>
+            <option value="Trading Floor">Trading Floor (Futuros/Índices)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Trader / Analista</label>
+          <select id="bt-trader" class="form-select">
+            <option value="all">Todos os Traders</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Dimensionamento</label>
+          <select id="bt-sizing" class="form-select">
+            <option value="fixed_capital" selected>Capital Fixo (R$ / trade)</option>
+            <option value="exact_copy">Copiar Qtd Original</option>
+            <option value="fixed_quantity">Lote Fixo (ex: 100 un)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Capital por Trade (R$)</label>
+          <input type="number" id="bt-capital-trade" class="form-input" value="1000" step="100">
+        </div>
+
+        <div class="form-group">
+          <label>Capital Inicial (R$)</label>
+          <input type="number" id="bt-initial-equity" class="form-input" value="10000" step="1000">
+        </div>
+
+        <div class="form-group">
+          <label>Data Início</label>
+          <input type="date" id="bt-date-from" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label>Data Fim</label>
+          <input type="date" id="bt-date-to" class="form-input">
+        </div>
+
+        <div class="form-group" style="display: flex; flex-direction: row; gap: 0.5rem;">
+          <button id="btn-run-backtest" class="btn btn-primary" onclick="runBacktest()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Executar
+          </button>
+          <button class="btn btn-secondary" onclick="syncBacktestCache()" title="Baixar novos dados da plataforma">
+            ↻ Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Backtest Summary Cards -->
+      <div class="metrics-grid">
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Retorno Líquido Total</span>
+            <div class="card-icon">💰</div>
+          </div>
+          <div id="bt-res-profit" class="card-value positive">0,00</div>
+          <div id="bt-res-roi" class="card-subtext">ROI: +0.0%</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Taxa de Acerto (Win Rate)</span>
+            <div class="card-icon">🎯</div>
+          </div>
+          <div id="bt-res-winrate" class="card-value cyan">0.0%</div>
+          <div id="bt-res-trades-count" class="card-subtext">0 trades (0 vitórias / 0 derrotas)</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Fator de Lucro (Profit Factor)</span>
+            <div class="card-icon">📈</div>
+          </div>
+          <div id="bt-res-pf" class="card-value">0.00</div>
+          <div id="bt-res-payoff" class="card-subtext">Payoff: 0.00x</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Drawdown Máximo</span>
+            <div class="card-icon">📉</div>
+          </div>
+          <div id="bt-res-dd" class="card-value negative">0,00</div>
+          <div id="bt-res-dd-pct" class="card-subtext">Queda máx: 0.0%</div>
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="charts-grid">
+        <!-- Equity Curve Chart -->
+        <div class="chart-card">
+          <h3 class="section-title" style="margin-bottom: 0.75rem;">
+            Curva de Patrimônio Acumulada (Equity Curve)
+          </h3>
+          <div class="chart-container">
+            <canvas id="chart-equity"></canvas>
+          </div>
+        </div>
+
+        <!-- Traders Performance Chart -->
+        <div class="chart-card">
+          <h3 class="section-title" style="margin-bottom: 0.75rem;">
+            Lucro por Analista / Trader
+          </h3>
+          <div class="chart-container">
+            <canvas id="chart-traders"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backtest Trades Table -->
+      <div class="section-header">
+        <h2 class="section-title">Operações Simuladas no Backtest</h2>
+        <span id="bt-table-count" class="card-subtext">0 operações</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Trader</th>
+              <th>Lado</th>
+              <th>Qtd Simulada</th>
+              <th>Preço Entrada</th>
+              <th>Preço Saída</th>
+              <th>Retorno (%)</th>
+              <th>Resultado</th>
+              <th>Entrada</th>
+              <th>Saída</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-bt-trades">
+            <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Clique em 'Executar' para carregar a simulação.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- ABA: PREVISÃO IA (GOOGLE TIMESFM)          -->
+    <!-- ========================================== -->
+    <section id="pane-ai-forecast" class="tab-pane">
+      <!-- AI Toolbar / Selector -->
+      <div class="filter-toolbar" style="grid-template-columns: 2fr 1fr auto;">
+        <div class="form-group">
+          <label>Selecionar Recomendação Ativa (ou Digite Ticker)</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <select id="ai-select-trade" class="form-select" style="flex: 1;" onchange="onSelectAiTrade()">
+              <option value="">Selecione um sinal aberto...</option>
+            </select>
+            <input type="text" id="ai-custom-ticker" class="form-input" style="max-width: 140px;" placeholder="Ex: PETRV480" onkeydown="if(event.key==='Enter') runAiPrediction()">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Horizonte de Previsão</label>
+          <select id="ai-horizon" class="form-select">
+            <option value="5">5 dias úteis (1 semana)</option>
+            <option value="10">10 dias úteis (2 semanas)</option>
+            <option value="15" selected>15 dias úteis (3 semanas)</option>
+            <option value="20">20 dias úteis (1 mês)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <button id="btn-run-ai" class="btn btn-primary" onclick="runAiPrediction()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            Prever com TimesFM
+          </button>
+        </div>
+      </div>
+
+      <!-- AI KPI Cards -->
+      <div class="metrics-grid">
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Score de Probabilidade IA</span>
+            <div class="card-icon">🧠</div>
+          </div>
+          <div id="ai-card-score" class="card-value cyan">-- %</div>
+          <div id="ai-card-score-sub" class="card-subtext">Google TimesFM 2.5 (200M)</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Veredito do Modelo</span>
+            <div class="card-icon">⚖️</div>
+          </div>
+          <div id="ai-card-verdict" class="card-value">AGUARDANDO</div>
+          <div id="ai-card-verdict-sub" class="card-subtext">Concordância com tese</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Ativo Subjacente (Papel Principal)</span>
+            <div class="card-icon">🏛️</div>
+          </div>
+          <div id="ai-card-underlying" class="card-value">--</div>
+          <div id="ai-card-underlying-sub" class="card-subtext">Preço Atual vs Projetado</div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header-compact">
+            <span class="card-title-subtle">Variação Projetada</span>
+            <div class="card-icon">🎯</div>
+          </div>
+          <div id="ai-card-change" class="card-value">0.00%</div>
+          <div id="ai-card-change-sub" class="card-subtext">Tendência esperada</div>
+        </div>
+      </div>
+
+      <!-- Main Forecast Chart Card -->
+      <div class="chart-card" style="margin-bottom: 1.5rem; min-height: 440px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 class="section-title" style="display: flex; align-items: center;">
+            Projeção TimesFM do Ativo Principal com Cones de Incerteza (Quantis 10% e 90%)
+            <span id="ai-underlying-badge" class="badge" style="background: rgba(0,229,255,0.15); color: var(--cyan); margin-left: 0.75rem; font-size: 0.82rem; font-weight: 600;"></span>
+          </h3>
+          <div id="ai-chart-legend" style="font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 1rem;">
+            <span><strong style="color: #64748b;">—</strong> Histórico</span>
+            <span><strong style="color: #00e5ff;">—</strong> Previsão TimesFM</span>
+            <span><strong style="color: rgba(0, 229, 255, 0.4);">▒</strong> Cone 10%-90%</span>
+            <span><strong style="color: #f59e0b;">- -</strong> Strike</span>
+          </div>
+        </div>
+        <div class="chart-container" style="height: 360px;">
+          <canvas id="chart-ai-forecast"></canvas>
+        </div>
+      </div>
+
+      <!-- AI Analytical Reasoning Card -->
+      <div class="glass-card" style="margin-bottom: 2rem;">
+        <h3 class="section-title" style="margin-bottom: 0.5rem;">
+          Relatório de Análise da IA
+        </h3>
+        <p id="ai-reasoning-text" style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
+          Selecione uma recomendação ou insira um ticker para que o Google TimesFM projete a série temporal do ativo principal na B3 e avalie o alinhamento com a opção.
+        </p>
+      </div>
+
+      <!-- Batch Active Recommendations Forecast Grid -->
+      <div class="section-header">
+        <h2 class="section-title">Score TimesFM das Recomendações Ativas</h2>
+        <button class="btn btn-secondary btn-sm" onclick="loadBatchAiForecasts()">Atualizar Todas as Previsões</button>
+      </div>
+      <div id="ai-batch-grid" class="metrics-grid">
+        <!-- Preenchido dinamicamente com cards de cada recomendação -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- ABA 3: CONFIGURAÇÕES                       -->
+    <!-- ========================================== -->
+    <section id="pane-settings" class="tab-pane">
+      <div class="settings-grid">
+
+        <!-- Gestão de Risco -->
+        <div class="settings-card">
+          <h3>Gestão de Risco e Dimensionamento</h3>
+          <p>Defina os limites de exposição financeira e cálculo de lote para cada ordem.</p>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Modelo de Dimensionamento</span>
+              <select id="cfg-sizing-mode" class="form-select">
+                <option value="fixed_capital">Capital Fixo (R$ por operação)</option>
+                <option value="fixed_quantity">Lote Fixo de Opções</option>
+                <option value="exact_copy">Copiar Quantidade Exata da Plataforma</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Capital Máximo por Operação (R$)</span>
+              <input type="number" id="cfg-fixed-capital" class="form-input" value="1000">
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Quantidade Fixa (caso use Lote Fixo)</span>
+              <input type="number" id="cfg-fixed-qty" class="form-input" value="100">
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Máximo de Posições Simultâneas</span>
+              <input type="number" id="cfg-max-positions" class="form-input" value="10">
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Desvio Máximo de Preço Aceitável - Slippage (%)</span>
+              <input type="number" id="cfg-max-slippage" class="form-input" value="5.0" step="0.5">
+            </label>
+          </div>
+        </div>
+
+        <!-- Parâmetros do MetaTrader 5 -->
+        <div class="settings-card">
+          <h3>Conexão MetaTrader 5 & Corretora</h3>
+          <p>Configurações para roteamento na corretora B3 via MT5.</p>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Caminho do terminal MT5 (terminal64.exe)</span>
+              <input type="text" id="cfg-mt5-path" class="form-input" placeholder="Deixe vazio para detecção automática">
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Tipo de Ordem</span>
+              <select id="cfg-order-type" class="form-select">
+                <option value="limit">Ordem Limitada no Preço Sugerido (Recomendado)</option>
+                <option value="market">Ordem a Mercado (Execução Imediata)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Magic Number (Identificador de Ordens do Robô)</span>
+              <input type="number" id="cfg-magic-number" class="form-input" value="998877">
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-group">
+              <span>Modo de Inicialização de Sinais</span>
+              <select id="cfg-initial-sync" class="form-select">
+                <option value="only_new">Apenas Novos Sinais (Ignora ordens abertas no passado)</option>
+                <option value="sync_all_open">Entrar nas Ordens já Abertas Imediatamente</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="saveSettings()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          Salvar Todas as Configurações
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- ABA: ESTRATÉGIAS & BASE DE CONHECIMENTO     -->
+    <!-- ========================================== -->
+    <section id="pane-strategies" class="tab-pane">
+      
+      <!-- Top Action Bar -->
+      <div class="control-bar" style="margin-bottom: 1.25rem;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.2rem;">
+            Inteligência de Estratégias & Base de Conhecimento
+          </h2>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">
+            Sinais mapeados por setup, rastreadores quantitativos, catálogo de estratégias e mineração histórica.
+          </span>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-secondary" onclick="runLiveScreener()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Atualizar Screener
+          </button>
+          <button id="btn-refresh-tf" class="btn btn-primary" onclick="refreshTfPatterns()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            Recalcular TradingFloor
+          </button>
+        </div>
+      </div>
+
+      <!-- Navegação por Sub-Abas -->
+      <div class="sub-nav-tabs">
+        <button class="sub-tab-btn active" data-subtab="strat-trades" onclick="switchStrategySubTab('strat-trades')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="12 8 8 12 12 16 12 8"></polygon></svg>
+          🎯 Trades por Estratégia
+        </button>
+        <button class="sub-tab-btn" data-subtab="screener" onclick="switchStrategySubTab('screener')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          🔍 Screener de Opções
+        </button>
+        <button class="sub-tab-btn" data-subtab="knowledge" onclick="switchStrategySubTab('knowledge')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          📚 Base de Conhecimento & YouTube
+        </button>
+        <button class="sub-tab-btn" data-subtab="analysts-db" onclick="switchStrategySubTab('analysts-db')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+          🏛️ Analistas & Banco de Dados
+        </button>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SUB-ABA 1: TRADES POR ESTRATÉGIA           -->
+      <!-- ========================================== -->
+      <div id="subpane-strat-trades" class="sub-tab-pane active">
+        <!-- Barra de Filtros e Resumo -->
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan);"></span>
+                Operações Ativas & Sinais Mapeados por Setup
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Verificação em tempo real de trades vinculados às estratégias do TradingFloor e aos sinais gerados pelo Screener.
+              </span>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <select id="filter-strat-select" class="form-select" style="font-size: 0.8rem; padding: 6px 12px; min-width: 260px;" onchange="filterStrategyTrades()">
+                <option value="all">Todas as Estratégias</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" onclick="loadStrategyTrades()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards de Resumo da Sub-Aba -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+            <div style="background: rgba(0,0,0,0.25); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total de Operações</span>
+              <div id="strat-trades-total-count" style="font-size: 1.4rem; font-weight: 800; color: #fff;">0</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.25); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Em Lucro / No Alvo</span>
+              <div id="strat-trades-win-count" style="font-size: 1.4rem; font-weight: 800; color: var(--accent-positive);">0</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.25); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Em Ajuste / Região Stop</span>
+              <div id="strat-trades-loss-count" style="font-size: 1.4rem; font-weight: 800; color: var(--accent-negative);">0</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.25); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Estratégias Ativas</span>
+              <div id="strat-trades-active-strats" style="font-size: 1.4rem; font-weight: 800; color: var(--cyan);">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela de Trades por Estratégia -->
+        <div class="glass-card">
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%; font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Estratégia Vinculada</th>
+                  <th>Ativo / Contrato</th>
+                  <th>Tipo</th>
+                  <th>Analista / Fonte</th>
+                  <th>Lado</th>
+                  <th style="text-align: right;">Preço Entrada</th>
+                  <th style="text-align: right;">Preço Atual</th>
+                  <th style="text-align: right;">PnL (%)</th>
+                  <th>Regra do Setup</th>
+                  <th>Alvo / Stop</th>
+                  <th>Aderência / Status</th>
+                  <th style="text-align: center;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="strat-trades-table-body">
+                <tr>
+                  <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <span class="loading-spinner"></span> Mapeando trades e sinais de estratégias...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SUB-ABA 2: HUB DE ESTRATÉGIAS & SCREENERS   -->
+      <!-- ========================================== -->
+      <div id="subpane-screener" class="sub-tab-pane">
+        
+        <!-- Barra de Ferramentas / Seletor de Setup -->
+        <div class="glass-card" style="margin-bottom: 1.25rem; padding: 0.75rem 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--cyan); text-transform: uppercase;">Setup Operacional:</span>
+              <div id="screener-tool-pills" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                <button class="btn btn-secondary btn-sm active" data-tool="put-selling" onclick="switchScreenerTool('put-selling')">🛡️ Venda de Put (-1 ATR)</button>
+                <button class="btn btn-secondary btn-sm" data-tool="bull-spread" onclick="switchScreenerTool('bull-spread')">📈 Trava de Alta (Bull Spread)</button>
+                <button class="btn btn-secondary btn-sm" data-tool="swing-trade" onclick="switchScreenerTool('swing-trade')">🎯 Swing Trade 72%</button>
+                <button class="btn btn-secondary btn-sm" data-tool="covered-call" onclick="switchScreenerTool('covered-call')">💰 Venda Coberta & Dividendos</button>
+                <button class="btn btn-secondary btn-sm" data-tool="futures-levels" onclick="switchScreenerTool('futures-levels')">⚡ Níveis Scalp Futuros</button>
+                <button class="btn btn-secondary btn-sm" data-tool="portfolio-allocator" onclick="switchScreenerTool('portfolio-allocator')">💼 Alocação R$ 100k</button>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="refreshCurrentScreenerTool()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Recalcular Oportunidades
+            </button>
+          </div>
+        </div>
+
+        <!-- 1. TOOL: VENDA DE PUT (-1 ATR / 300% CDI) -->
+        <div id="tool-view-put-selling" class="strategy-tool-view active">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-positive);"></span>
+                Scanner de Venda de Put OTM no Nível -1 ATR (STRAT-YT-001)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Estratégia auditada com 99% de acerto. Venda coberta por garantia no CDI com margem de segurança de 1 desvio ATR.
+              </span>
+            </div>
+            <div id="screener-header-info" style="font-size: 0.75rem; color: var(--text-muted);"></div>
+          </div>
+          <div id="screener-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+              Carregando cotações e calculando strikes recomendados...
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. TOOL: TRAVA DE ALTA COM CALL (BULL SPREAD) -->
+        <div id="tool-view-bull-spread" class="strategy-tool-view" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan);"></span>
+                Construtor de Trava de Alta com Call (Bull Call Spread - STRAT-YT-002)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Estrutura direcional com risco travado no débito inicial. Compra Call ATM e vende Call OTM no alvo (multiplicador 2x a 3x).
+              </span>
+            </div>
+          </div>
+          <div id="bull-spread-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+              Calculando spreads de alta para Blue Chips...
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. TOOL: SWING TRADE 72% ACERTO -->
+        <div id="tool-view-swing-trade" class="strategy-tool-view" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;"></span>
+                Scanner de Swing Trade B3: 72% de Acerto (STRAT-YT-003 & STRAT-TF-003)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Setup Rodrigo APMC / Sanita: MM20 alinhada, IFR-14 em zona de tração (45-65), rompimento de pivô, stop rigoroso (2.0%-2.5%) e alvos parciais (+3.5% e +5.5%).
+              </span>
+            </div>
+          </div>
+          <div class="glass-card" style="margin-bottom: 1rem;">
+            <div style="overflow-x: auto;">
+              <table class="data-table" style="width: 100%; font-size: 0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Ativo / Empresa</th>
+                    <th>Setor</th>
+                    <th style="text-align: right;">Cotação Atual</th>
+                    <th>IFR (14)</th>
+                    <th>Setup / Gatilho</th>
+                    <th>Preço de Entrada</th>
+                    <th style="text-align: right;">Stop Loss</th>
+                    <th style="text-align: right;">Alvo 1 (+3.5%)</th>
+                    <th style="text-align: right;">Alvo 2 (+5.5%)</th>
+                    <th>Relação R:R</th>
+                    <th style="text-align: center;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="swing-trade-table-body">
+                  <tr><td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-muted);">Varrendo ações líquidas da B3...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. TOOL: VENDA COBERTA & DIVIDENDOS SINTÉTICOS -->
+        <div id="tool-view-covered-call" class="strategy-tool-view" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #f59e0b;"></span>
+                Calculadora de Venda Coberta & Dividendos Sintéticos (STRAT-YT-004)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Rentabilização mensal de carteiras de Blue Chips. Venda de Call OTM acima do preço para gerar renda de 1.5% a 3.0% ao mês com proteção contra quedas.
+              </span>
+            </div>
+          </div>
+          <div id="covered-call-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+              Calculando dividendos sintéticos para Blue Chips...
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. TOOL: NÍVEIS DE SCALP EM FUTUROS (WINFUT / WDOFUT) -->
+        <div id="tool-view-futures-levels" class="strategy-tool-view" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ec4899;"></span>
+                Painel de Níveis Técnicos e Scalp em Futuros B3 (STRAT-TF-001 / 002 / 006)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Setups Brondi, Calvete e Guilherme: Pivot Points diários, Suportes (S1, S2), Resistências (R1, R2) e zonas de scalp rápido em Mini-Índice e Mini-Dólar.
+              </span>
+            </div>
+          </div>
+          <div id="futures-levels-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.25rem;">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+              Calculando Pivot Points e zonas de compra/venda para futuros...
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. TOOL: SIMULADOR DE ALOCAÇÃO PATRIMONIAL (R$ 100K) -->
+        <div id="tool-view-portfolio-allocator" class="strategy-tool-view" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #10b981;"></span>
+                Simulador de Alocação Híbrida de Capital & Renda Passiva (STRAT-YT-007)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Modelo de R$ 100k com Dividendos Sintéticos: 60% Renda Fixa (garantia no CDI), 30% Ações Dividendistas e 10% Caixa Livre.
+              </span>
+            </div>
+          </div>
+
+          <!-- Controle de Capital do Usuário -->
+          <div class="glass-card" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Capital Disponível para Alocação (R$):</label>
+                <input type="number" id="alloc-capital-input" class="form-input" value="100000" step="5000" min="10000" style="font-size: 1rem; font-weight: 700; max-width: 220px;">
+              </div>
+              <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                <button class="btn btn-secondary btn-sm" onclick="setSimCapital(50000)">R$ 50k</button>
+                <button class="btn btn-secondary btn-sm" onclick="setSimCapital(100000)">R$ 100k</button>
+                <button class="btn btn-secondary btn-sm" onclick="setSimCapital(250000)">R$ 250k</button>
+                <button class="btn btn-secondary btn-sm" onclick="setSimCapital(500000)">R$ 500k</button>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="runAllocationSimulation()" style="margin-top: auto;">
+                Calcular Renda Mensal
+              </button>
+            </div>
+          </div>
+
+          <div id="portfolio-alloc-results">
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+              Clique em 'Calcular Renda Mensal' para visualizar a carteira recomendada.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SUB-ABA 3: BASE DE CONHECIMENTO & YOUTUBE  -->
+      <!-- ========================================== -->
+      <div id="subpane-knowledge" class="sub-tab-pane">
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+          
+          <!-- Coluna Esquerda: Catálogo Registrado -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.8rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600; color: #fff;">
+                📖 Catálogo Unificado da Base de Conhecimento (17 Estratégias)
+              </h3>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Setups Validados & Documentados</span>
+            </div>
+            <div id="strategies-catalog-list"></div>
+          </div>
+
+          <!-- Coluna Direita: Ingestão de Canais do YouTube -->
+          <div>
+            <div class="glass-card" style="margin-bottom: 1rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600; color: #fff; margin-bottom: 0.4rem;">
+                🎥 Ingestão & Rastreamento de Canais do YouTube
+              </h3>
+              <p style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+                Cole o link de qualquer vídeo educativo ou de trading. O robô identificará o canal, listará todos os vídeos de trade e catalogará o setup.
+              </p>
+
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 0.6rem;">
+                <input type="text" id="yt-crawl-url-input" class="form-input" placeholder="Ex: https://www.youtube.com/watch?v=L48NBs21q6g" style="font-size: 0.82rem;">
+                <button id="btn-yt-crawl-submit" class="btn btn-primary" onclick="handleYouTubeCrawlSubmit()" style="white-space: nowrap; font-size: 0.82rem;">
+                  Inspecionar Canal
+                </button>
+              </div>
+              <div id="yt-crawl-status" style="display: none; padding: 0.5rem; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;"></div>
+            </div>
+
+            <!-- Lista de Vídeos Candidatos Mapeados -->
+            <div class="glass-card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                <h4 style="font-size: 0.9rem; font-weight: 600; color: #fff;">Vídeos com Estratégia no Canal</h4>
+                <span class="badge badge-secondary" style="font-size: 0.7rem;">Canal: Jimmy Carvalho</span>
+              </div>
+              <div id="yt-candidates-list" style="max-height: 380px; overflow-y: auto;">
+                <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.78rem;">Carregando lista de vídeos...</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SUB-ABA 4: ANALISTAS & BANCO DE DADOS      -->
+      <!-- ========================================== -->
+      <div id="subpane-analysts-db" class="sub-tab-pane">
+        <!-- SEÇÃO 3: RANKING & PADRÕES DO TRADINGFLOOR -->
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 600; color: #fff;">
+                🏛️ Desempenho Quantitativo por Trader: TradingFloor B3
+              </h3>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">
+                Mineração estatística de 2.266 operações históricas únicas (Futuros B3, Opções e Ações)
+              </span>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%; font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>Trader</th>
+                  <th>Total Operações</th>
+                  <th>Win Rate (%)</th>
+                  <th>Payoff Ratio</th>
+                  <th>Profit Factor</th>
+                  <th>PnL Acumulado</th>
+                  <th>Expectância/Trade</th>
+                  <th>Ativos Principais</th>
+                </tr>
+              </thead>
+              <tbody id="tf-traders-table-body">
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                    Carregando métricas dos traders...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 4: EXPLORADOR HISTÓRICO DE TRADES DO BANCO -->
+        <div class="glass-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 600; color: #fff; margin-bottom: 0.2rem;">
+                🔍 Explorador Histórico de Operações (Banco Local: 2.266 Trades Únicos)
+              </h3>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">
+                Acesso irrestrito a todos os trades com registros duplicados reconciliados e preços consolidados.
+              </span>
+            </div>
+            <div id="db-trades-counter" style="font-size: 0.8rem; font-weight: 600; color: var(--accent-cyan);">
+              Carregando contagem...
+            </div>
+          </div>
+
+          <!-- Barra de Filtros Avançados -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; background: rgba(0,0,0,0.25); padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem;">
+            <div>
+              <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Status</label>
+              <select id="db-filter-status" class="form-select" style="font-size: 0.78rem; padding: 4px 8px;" onchange="loadDatabaseTrades(0)">
+                <option value="all">Todos os Status</option>
+                <option value="OPEN">Abertos (OPEN)</option>
+                <option value="CLOSED">Encerrados (CLOSED)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Produto</label>
+              <select id="db-filter-product" class="form-select" style="font-size: 0.78rem; padding: 4px 8px;" onchange="loadDatabaseTrades(0)">
+                <option value="all">Todos os Produtos</option>
+                <option value="Trading Floor">Trading Floor</option>
+                <option value="Opções">Opções</option>
+                <option value="Desafio Eleições">Desafio Eleições</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Tipo de Ativo</label>
+              <select id="db-filter-asset" class="form-select" style="font-size: 0.78rem; padding: 4px 8px;" onchange="loadDatabaseTrades(0)">
+                <option value="all">Todos os Ativos</option>
+                <option value="Futuros (B3)">Futuros (B3)</option>
+                <option value="OPCOES">Opções</option>
+                <option value="Ações/FIIs/BDRs (B3)">Ações B3</option>
+                <option value="Commodities">Commodities</option>
+                <option value="Forex">Forex</option>
+                <option value="Cripto">Cripto</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Trader</label>
+              <select id="db-filter-trader" class="form-select" style="font-size: 0.78rem; padding: 4px 8px;" onchange="loadDatabaseTrades(0)">
+                <option value="all">Todos os Traders</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Buscar Ticker</label>
+              <input type="text" id="db-filter-ticker" class="form-input" placeholder="Ex: WINFUT, VALE3..." style="font-size: 0.78rem; padding: 4px 8px;" onkeyup="if(event.key==='Enter') loadDatabaseTrades(0)">
+            </div>
+          </div>
+
+          <!-- Tabela de Trades do Banco -->
+          <div style="overflow-x: auto; max-height: 480px;">
+            <table class="data-table" style="width: 100%; font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Produto</th>
+                  <th>Tipo de Ativo</th>
+                  <th>Trader</th>
+                  <th>Lado</th>
+                  <th>Qtd</th>
+                  <th>Preço Entrada</th>
+                  <th>Preço Saída</th>
+                  <th>PnL</th>
+                  <th>Pontos</th>
+                  <th>Entrada</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="db-trades-table-body">
+                <tr>
+                  <td colspan="12" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                    Carregando operações do banco...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paginação -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
+            <button id="btn-db-prev" class="btn btn-secondary btn-sm" onclick="paginateDbTrades(-1)">← Página Anterior</button>
+            <span id="db-pagination-info" style="color: var(--text-muted);">Página 1</span>
+            <button id="btn-db-next" class="btn btn-secondary btn-sm" onclick="paginateDbTrades(1)">Próxima Página →</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- ABA 4: LOGS & TERMINAL                     -->
+    <!-- ========================================== -->
+    <section id="pane-logs" class="tab-pane">
+      <div class="terminal-card">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">tradingfloors_bot.log</span>
+          <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Limpar Console</button>
+        </div>
+        <div id="terminal-body" class="terminal-body">
+          <div class="log-entry">
+            <span class="log-time">[--:--:--]</span>
+            <span class="log-level INFO">[INFO]</span>
+            <span class="log-msg">Interface Web conectada. Aguardando eventos do robô...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Custom Scripts -->
+  <script src="/static/js/backtest.js"></script>
+  <script src="/static/js/ai_forecast.js"></script>
+  <script src="/static/js/strategies.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

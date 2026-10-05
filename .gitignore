@@ -1,0 +1,26 @@
+# Segredos
+config/.env
+
+# Bancos e caches locais
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+database/backups/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs e rascunhos
+logs/
+scratch/
+_archive/
+
+# IDE / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

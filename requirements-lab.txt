@@ -1,0 +1,5 @@
+# Laboratório: previsão com Google TimesFM (pesado, opcional)
+-r requirements.txt
+torch>=2.2
+timesfm>=2.0
+metatrader5>=5.0.45
