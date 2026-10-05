@@ -1,5 +1,9 @@
-# Laboratório: previsão com Google TimesFM (pesado, opcional)
+# Laboratório (opcional): previsão IA com Google TimesFM e importação de vídeos do YouTube
 -r requirements.txt
 torch>=2.2
 timesfm>=2.0
-metatrader5>=5.0.45
+yt-dlp>=2024.0
+youtube-transcript-api>=1.0
+
+# Fase 6 (execução automática no MetaTrader 5) — só instale quando for usar
+# metatrader5>=5.0.45

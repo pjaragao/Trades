@@ -1,4 +1,4 @@
 """
-TradingFloors to MetaTrader 5 Automation Bot
+Copiloto de Trades — sinais do TradingFloors operados manualmente no Home Broker.
 """
-__version__ = "1.0.0"
+__version__ = "2.0.0"

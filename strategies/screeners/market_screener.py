@@ -18,14 +18,16 @@ from strategies.screeners.futures_levels_engine import FuturesLevelsEngine
 from strategies.screeners.portfolio_allocator import PortfolioAllocator
 
 class MarketScreenerService:
-    def __init__(self, catalog_path: str = "strategies/knowledge_base/catalog.json"):
+    def __init__(self, catalog_path: str = "strategies/knowledge_base/catalog.json", cdi_annual: Optional[float] = None):
+        # CDI atual (BCB) quando informado; os módulos mantêm 11,75% só como padrão de linha de comando
+        cdi = cdi_annual if cdi_annual is not None else 0.1175
         self.catalog_path = catalog_path
-        self.put_screener = PutSellingScreener()
-        self.bull_screener = BullSpreadScreener()
+        self.put_screener = PutSellingScreener(cdi_annual=cdi)
+        self.bull_screener = BullSpreadScreener(cdi_annual=cdi)
         self.swing_screener = SwingTradeScreener()
-        self.covered_screener = CoveredCallScreener()
+        self.covered_screener = CoveredCallScreener(cdi_annual=cdi)
         self.futures_engine = FuturesLevelsEngine()
-        self.allocator = PortfolioAllocator()
+        self.allocator = PortfolioAllocator(cdi_annual=cdi)
 
     def get_catalog(self) -> Dict[str, Any]:
         if os.path.exists(self.catalog_path):

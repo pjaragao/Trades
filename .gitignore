@@ -24,3 +24,6 @@ _archive/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Configuração local do preview (caminhos desta máquina)
+.claude/launch.json

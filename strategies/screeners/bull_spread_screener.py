@@ -26,8 +26,9 @@ DEFAULT_SPREAD_WATCHLIST = [
 ]
 
 class BullSpreadScreener:
-    def __init__(self):
+    def __init__(self, cdi_annual: float = 0.1175):
         self.feed = PriceDataFeed()
+        self.cdi_annual = cdi_annual
 
     def get_expiration_info(self) -> Dict[str, Any]:
         """Calcula a 3ª sexta-feira do mês de vencimento mais próximo."""
@@ -63,7 +64,7 @@ class BullSpreadScreener:
     def _approx_call_price(self, spot: float, strike: float, days: int, iv: float) -> float:
         """Aproximação Black-Scholes simplificada para prêmio de Call."""
         t = max(days, 1) / 365.0
-        r = 0.1175 # taxa livre de risco SELIC/CDI
+        r = self.cdi_annual  # taxa livre de risco (CDI do BCB via MarketScreenerService)
         vol = max(iv, 0.15)
         
         d1 = (math.log(spot / strike) + (r + 0.5 * vol**2) * t) / (vol * math.sqrt(t))

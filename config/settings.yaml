@@ -1,12 +1,38 @@
+# Copiloto de Trades — configuração de infraestrutura.
+# Preferências do dia a dia (capital, tamanho da posição, analistas seguidos, custos, alertas)
+# ficam na tela Configurações do app (gravadas em database/app.db).
 app:
-  name: TradingFloors MT5 Copier
-  version: 1.0.0
+  name: Copiloto de Trades
+  version: 2.0.0
+
+trading_floors:
+  supabase_url: https://ayvqtffpfmfescxzqifp.supabase.co
+  supabase_anon_key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5dnF0ZmZwZm1mZXNjeHpxaWZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NTg1NDgsImV4cCI6MjEwMTMzNDU0OH0.-Hg2FQILqSSeWSRCYHKOUaBClP6ftMifVVOWD3OpLkA
+  # Usados apenas pelo robô antigo (src/execution/legacy). O Copiloto filtra pela tela Configurações.
+  allowed_products:
+  - Trading Floor
+  - Desafio Eleições
+  - Opções
+  allowed_traders: []
+
+monitor:
+  # Intervalo de consulta ao TradingFloors durante o pregão (fora dele: 3x maior, mínimo 60 s)
+  poll_seconds: 20
+
+# market:              # opcional: sobrescreve o horário do pregão (padrão ajusta ao horário de verão dos EUA)
+#   pre_open: "09:45"
+#   open: "10:00"
+#   close: "16:55"
+#   closing_call_end: "17:00"
+
 execution:
   # Fase manual: execução automática no MT5 DESLIGADA. Só ligue na Fase 6.
   enabled: false
   dry_run: true
   initial_sync_mode: only_new
   poll_interval_seconds: 5
+
+# Parâmetros do robô antigo (src/execution/legacy) — não usados pelo Copiloto
 mt5:
   deviation_points: 10
   magic_number: 998877
@@ -20,11 +46,3 @@ risk:
   max_slippage_pct: 5.0
   options_lot_step: 100
   sizing_mode: fixed_capital
-trading_floors:
-  allowed_products:
-  - Trading Floor
-  - Desafio Eleições
-  - Opções
-  allowed_traders: []
-  supabase_anon_key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5dnF0ZmZwZm1mZXNjeHpxaWZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NTg1NDgsImV4cCI6MjEwMTMzNDU0OH0.-Hg2FQILqSSeWSRCYHKOUaBClP6ftMifVVOWD3OpLkA
-  supabase_url: https://ayvqtffpfmfescxzqifp.supabase.co
