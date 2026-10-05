@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from src.core import db
 from src.core.config import get_prefs
 from src.core.market_hours import now_brt, to_brt
-from src.services import journal, tax
+from src.services import journal
 from src.services.signals import hydrate
 
 
@@ -153,20 +153,10 @@ def summary(date_from: Optional[str] = None, date_to: Optional[str] = None, conn
 
 
 def tax_report(conn=None) -> Dict[str, Any]:
-    with db.connection(conn) as c:
-        led = journal.ledger(c)
-    from src.services.brokerage_notes import irrf_by_month
+    """Compatibilidade: a apuração completa vive em src/services/irpf.py (tela Notas e IR)."""
+    from src.services import irpf
 
-    rows = tax.monthly_tax(led["events"], until=now_brt().date().isoformat()[:7], irrf_actual=irrf_by_month())
-    return {
-        "months": rows,
-        "total_darf": round(sum(r["darf_value"] for r in rows), 2),
-        "notes": [
-            "Estimativa. Confira com o relatório da sua corretora/contador antes de pagar.",
-            "FIIs, ETFs e BDRs são tratados como ações (a isenção de R$ 20 mil vale só para ações).",
-            "IRRF: usa o valor das notas importadas; sem nota, estima 0,005% sobre vendas (swing). Day trade: 1% do ganho (estimado).",
-        ],
-    }
+    return irpf.report(conn)
 
 
 def executions_csv(conn=None, account: str = "real") -> str:

@@ -8,7 +8,7 @@ bp = Blueprint("notes_api", __name__, url_prefix="/api/notes")
 
 @bp.get("")
 def list_notes():
-    return jsonify({"notes": bn.list_notes(), "calibration": bn.fee_calibration(apply=False)})
+    return jsonify({"notes": bn.list_notes(), "calibration": bn.fee_calibration(apply=False), "coverage": bn.coverage()})
 
 
 @bp.post("/parse")

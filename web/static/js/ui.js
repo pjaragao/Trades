@@ -40,6 +40,7 @@ const P = {
   filter: '<path d="M22 3H2l8 9.5V19l4 2v-8.5z"/>',
   play: '<path d="m6 3 14 9-14 9z"/>',
   telegram: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+  receipt: '<path d="M4 2v20l2-1.3 2 1.3 2-1.3 2 1.3 2-1.3 2 1.3 2-1.3 2 1.3V2l-2 1.3L16 2l-2 1.3L12 2l-2 1.3L8 2 6 3.3Z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   volume: '<path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
 };
 

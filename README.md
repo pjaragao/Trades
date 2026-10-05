@@ -61,8 +61,9 @@ Copie `config/.env.example` para `config/.env`, preencha `TF_EMAIL`/`TF_PASSWORD
 | Executar: no Home Broker (**Copiar boleta** → **Executei**) ou **Enviar ao MT5** (com confirmação) | **Hoje** / **Sinais** |
 | Acompanhar posição: preço médio, P&L, retorno do sinal, vencimento, ordens abertas | **Carteira** |
 | Analista encerra → **Saída pendente** com boleta de saída (ou envio ao MT5) | **Hoje** / **Carteira** |
-| Importar a nota de corretagem → custos reais, IRRF e taxas calibradas | **Carteira** / **Resultados** |
-| Resultado real, slippage vs. analista, IR/DARF, CSV | **Resultados** |
+| Importar a nota de corretagem → histórico ajustado à nota (qtd, preço, data, custos), IRRF e taxas calibradas | **Notas e IR** / **Carteira** |
+| Resultado real, slippage vs. analista, CSV | **Resultados** |
+| IRPF mês a mês (fechado com notas x estimado), DARF, IR se encerrar tudo agora, resumo anual | **Notas e IR** |
 | Quem vale a pena seguir? Backtest de cópia, screeners, IA, base de conhecimento | **Laboratório** |
 
 ## Cotações
@@ -127,17 +128,34 @@ O horário dos ticks/negócios do MT5 vem no fuso do servidor da corretora (Bras
 
 ## Notas de corretagem
 
-Carteira ou Resultados › **Importar notas de corretagem**: envie os PDFs (XP, Genial ou outra corretora no padrão
-SINACOR; PDF com senha é aceito — na XP são os 3 primeiros dígitos do CPF). O Copiloto:
+**Notas e IR** (ou Carteira) › **Importar notas de corretagem**: envie os PDFs (XP, Genial ou outra corretora no padrão
+SINACOR; PDF com senha é aceito — na XP são os 3 primeiros dígitos do CPF). **A nota é a verdade** e o histórico é
+ajustado a ela:
 
-- lê os negócios e o resumo financeiro (liquidação, registro, emolumentos, corretagem, ISS, IRRF);
-- concilia com suas execuções do mesmo dia/ativo/lado, aplica os **custos reais** (rateados pelo valor) e corrige o preço;
-- cria as execuções que faltam (importe as notas em ordem cronológica);
-- recalcula as **taxas B3 e a corretagem estimadas** a partir das suas notas;
-- usa o **IRRF real** das notas na apuração mensal.
+- quantidade, preço (de entrada e de saída), data do pregão e **custos reais** (rateados pelo valor) passam a ser os da nota;
+- várias execuções no mesmo dia: usa as que somam a quantidade da nota (cada uma com o preço do seu negócio, quando dá);
+  se não bater, elas viram uma só com os números da nota;
+- execução registrada em outro dia (até 7 dias, sem nota própria) tem a data corrigida para o pregão da nota;
+- o que falta é criado (inclusive vendas que abrem posição, ex.: lançamento de opções);
+- o que você registrou no pregão mas não está na nota aparece para **manter** (pode ser de outra corretora) ou **excluir**;
+- recalcula as **taxas B3 e a corretagem estimadas** a partir das suas notas e guarda o **IRRF** de cada pregão;
+- **desfazer** devolve as execuções ao estado anterior. Importe as notas em ordem cronológica.
 
 Notas de BM&F (futuros) têm outro layout e não são lidas. Tickers de ações vêm do "nome de pregão"; se algum não for
 reconhecido, a prévia pede para você digitar.
+
+## Imposto de renda (Notas e IR)
+
+- **Apuração mês a mês** com memória de cálculo: ações (isenção até R$ 20 mil de vendas no mês), opções e outros
+  (sem isenção), day trade, prejuízos a compensar (swing e day trade separados), IRRF, DARF 6015 e vencimento.
+- **Só fecha com nota:** o mês fica *Fechado com notas* quando todos os pregões com operações têm nota importada; caso
+  contrário o valor aparece como *Estimado*, com a lista dos pregões sem nota.
+- **Se eu encerrar tudo agora:** simula vender/recomprar todas as posições abertas ao preço atual (com custos estimados)
+  e mostra o IR do mês antes e depois, posição por posição — incluindo day trade de quem foi comprado hoje e a perda
+  da isenção se as vendas de ações passarem de R$ 20 mil.
+- **Resumo anual** para a declaração: lucro isento com ações, resultados tributáveis, DARF, IRRF e prejuízo a compensar.
+
+Simplificações: FIIs, ETFs e BDRs entram como ações. Confira com seu contador.
 
 ## Estrutura
 

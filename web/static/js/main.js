@@ -11,6 +11,7 @@ import today from './pages/today.js';
 import signals from './pages/signals.js';
 import portfolio from './pages/portfolio.js';
 import results from './pages/results.js';
+import ir from './pages/ir.js';
 import lab from './pages/lab.js';
 import settings from './pages/settings.js';
 
@@ -19,7 +20,8 @@ const ROUTES = [
   { path: 'sinais', label: 'Sinais', icon: 'signals', page: signals },
   { path: 'carteira', label: 'Carteira', icon: 'wallet', page: portfolio },
   { path: 'resultados', label: 'Resultados', icon: 'chart', page: results },
-  { path: 'laboratorio', label: 'Laboratório', icon: 'flask', page: lab, sep: true },
+  { path: 'ir', label: 'IR', longLabel: 'Notas e IR', icon: 'receipt', page: ir },
+  { path: 'laboratorio', label: 'Laboratório', icon: 'flask', page: lab, sep: true, desktopOnly: true },
   { path: 'configuracoes', label: 'Config.', longLabel: 'Configurações', icon: 'settings', page: settings },
 ];
 
@@ -31,7 +33,7 @@ let mountToken = 0;
 function renderNav() {
   const link = (r) => `<a class="nav-link" href="#/${r.path}" data-route="${r.path}">${icon(r.icon)}<span class="nav-label">${esc(r.longLabel || r.label)}</span><span class="nav-badge" data-badge="${r.path}" hidden></span></a>`;
   document.getElementById('nav-side').innerHTML = ROUTES.map((r) => (r.sep ? '<div class="nav-sep"></div>' : '') + link(r)).join('');
-  document.getElementById('nav-bottom').innerHTML = ROUTES.map((r) => `<a class="nav-link" href="#/${r.path}" data-route="${r.path}" style="position:relative">${icon(r.icon)}<span class="nav-label">${esc(r.label)}</span><span class="nav-badge" data-badge="${r.path}" hidden></span></a>`).join('');
+  document.getElementById('nav-bottom').innerHTML = ROUTES.filter((r) => !r.desktopOnly).map((r) => `<a class="nav-link" href="#/${r.path}" data-route="${r.path}" style="position:relative">${icon(r.icon)}<span class="nav-label">${esc(r.label)}</span><span class="nav-badge" data-badge="${r.path}" hidden></span></a>`).join('');
 }
 
 function parseHash() {

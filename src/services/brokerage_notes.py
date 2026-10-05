@@ -4,9 +4,10 @@ Importador de notas de corretagem no padrão SINACOR/B3 (XP, Genial e outras cor
 Fluxo:
 1. `read_pdf()` extrai o texto de cada página (aceita PDF com senha — XP usa os 3 primeiros dígitos do CPF).
 2. `parse_pages()` agrupa as páginas por nota e extrai negócios + resumo financeiro (custos, IRRF, líquido).
-3. `build_preview()` resolve os tickers e concilia com as execuções já registradas (mesmo dia/ativo/lado).
-4. `apply_preview()` grava: atualiza custos (rateados pelo valor de cada negócio), cria as execuções que
-   faltam e guarda a nota (evita importar duas vezes).
+3. `build_preview()` resolve os tickers e concilia com as execuções já registradas — a nota é a verdade:
+   quantidade, preço, custos (rateados pelo valor) e data do pregão passam a ser os da nota; o que falta é criado
+   e o que foi registrado no pregão mas não aparece na nota é listado para manter ou excluir.
+4. `apply_preview()` grava tudo numa transação por nota e guarda o estado anterior (desfazer restaura).
 5. `fee_calibration()` calcula as taxas B3 efetivas das suas notas para alimentar as estimativas.
 
 Notas de BM&F (futuros) têm outro layout e não são lidas aqui.
@@ -18,6 +19,7 @@ import re
 import unicodedata
 from collections import defaultdict
 from datetime import datetime
+from itertools import combinations
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.core import b3_tickers, db
@@ -233,7 +235,11 @@ def _fees(text: str) -> Dict[str, Any]:
     m = re.search(r"i\.?r\.?r\.?f\.?\s*s/\s*operac\w*,?\s*base\s*r\$\s*(" + MONEY + r")?\s*(" + MONEY + r")", scope)
     if m:
         irrf = _money(m.group(2))
-    out: Dict[str, Any] = {"items": fees, "irrf": irrf}
+    irrf_day = None  # "IRRF Day Trade: Base R$ x Projeção R$ y" (1% do ganho do day trade no dia)
+    m = re.search(r"i\.?r\.?r\.?f\.?\s*day\s*trade[^\n]*?proje\w*\s*r?\$?\s*(" + MONEY + r")", t)
+    if m:
+        irrf_day = _money(m.group(1))
+    out: Dict[str, Any] = {"items": fees, "irrf": irrf, "irrf_day": irrf_day}
     m = re.search(r"valor liquido das operacoes\s*(" + MONEY + r")\s*([dc])?", scope)
     if m:
         v = _money(m.group(1))
@@ -295,6 +301,11 @@ def _finish(n: Dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------- prévia e conciliação
+EPS = 1e-6
+NEAR_DAYS = 7          # execução registrada em outra data (até 7 dias) sem nota própria: a data é corrigida
+MAX_SUBSET = 12        # combinações de execuções do mesmo dia testadas para bater a quantidade da nota
+
+
 def _group_trades(note: Dict[str, Any]) -> List[Dict[str, Any]]:
     groups: Dict[Tuple[str, str], Dict[str, Any]] = {}
     total_value = sum(t["value"] for t in note["trades"]) or 1.0
@@ -302,10 +313,10 @@ def _group_trades(note: Dict[str, Any]) -> List[Dict[str, Any]]:
         ticker, how = resolve_ticker(t["spec"], t["market"])
         key = (ticker or f"?{t['spec']}", t["side"])
         g = groups.setdefault(key, {"ticker": ticker, "resolved_by": how, "spec": t["spec"], "market": t["market"],
-                                    "side": t["side"], "quantity": 0.0, "value": 0.0, "lines": 0, "day_trade": False})
+                                    "side": t["side"], "quantity": 0.0, "value": 0.0, "lines": [], "day_trade": False})
         g["quantity"] += t["quantity"]
         g["value"] += t["value"]
-        g["lines"] += 1
+        g["lines"].append({"quantity": t["quantity"], "price": t["price"]})
         g["day_trade"] = g["day_trade"] or "D" in t["obs"]
     out = []
     for g in groups.values():
@@ -321,140 +332,301 @@ def _group_trades(note: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
-def _match(c, note: Dict[str, Any], g: Dict[str, Any]) -> None:
-    g["matches"], g["action"], g["match_note"] = [], "create", ""
-    if not note.get("trade_date") or not g["ticker"]:
-        g["action"] = "skip" if not g["ticker"] else "create"
-        g["match_note"] = "Informe o ticker para importar." if not g["ticker"] else ""
+def _day(row: Dict[str, Any]) -> str:
+    return (to_brt(row["executed_at"]) or datetime.min.replace(tzinfo=BRT)).date().isoformat()
+
+
+def _exact_subset(rows: List[Dict[str, Any]], qty: float) -> Optional[List[Dict[str, Any]]]:
+    """Execuções do mesmo dia cuja soma bate a quantidade da nota (todas, ou a menor combinação que bate)."""
+    if abs(sum(r["quantity"] for r in rows) - qty) < EPS:
+        return rows
+    if len(rows) > MAX_SUBSET:
+        return None
+    for size in range(1, len(rows)):
+        for combo in combinations(rows, size):
+            if abs(sum(r["quantity"] for r in combo) - qty) < EPS:
+                return list(combo)
+    return None
+
+
+def _fmt_q(q: float) -> str:
+    return f"{q:,.0f}".replace(",", ".") if float(q).is_integer() else f"{q:,.2f}"
+
+
+def _fmt_p(p: float) -> str:
+    return f"{p:,.4f}".rstrip("0").rstrip(",.").replace(",", "X").replace(".", ",").replace("X", ".") if p else "0"
+
+
+def _fmt_d(iso: str) -> str:
+    return f"{iso[8:10]}/{iso[5:7]}"
+
+
+def _reconcile(c, note: Dict[str, Any], g: Dict[str, Any], claimed: set, note_dates: set) -> None:
+    """
+    Decide o que fazer com um ativo/lado da nota (a nota é a verdade):
+      update  : execuções registradas batem a quantidade -> preço, custos (e data) passam a ser os da nota
+      replace : quantidade não bate -> as execuções do dia viram uma só, com quantidade/preço/custos da nota
+      create  : não há registro -> cria a execução
+      skip    : sem data/ticker (ou escolha do usuário)
+    """
+    g.update(matches=[], action="create", match_note="Não há execução registrada — será criada.", registered=None)
+    if not note.get("trade_date"):
+        g.update(action="skip", match_note="Nota sem data do pregão.")
         return
+    if not g["ticker"]:
+        g.update(action="skip", match_note="Informe o ticker para importar.")
+        return
+    D = note["trade_date"]
     rows = [dict(r) for r in c.execute(
-        "SELECT * FROM executions WHERE account = 'real' AND ticker = ? AND side = ? AND (note_id IS NULL)", (g["ticker"], g["side"]))]
-    same_day = [r for r in rows if (to_brt(r["executed_at"]) or datetime.min.replace(tzinfo=BRT)).date().isoformat() == note["trade_date"]]
-    if not same_day:
-        g["match_note"] = "Não há execução registrada — será criada."
-        return
-    q = sum(r["quantity"] for r in same_day)
-    g["matches"] = [{"id": r["id"], "quantity": r["quantity"], "price": r["price"], "fees": r["fees"], "fees_source": r["fees_source"]} for r in same_day]
-    if abs(q - g["quantity"]) < 1e-6:
-        g["action"] = "update"
-        price_diff = len(same_day) == 1 and abs(same_day[0]["price"] - g["price"]) > 0.00005
-        g["match_note"] = "Custos reais serão aplicados" + (f"; preço corrigido de {same_day[0]['price']:.2f} para {g['price']:.4f}" if price_diff else "") + "."
+        "SELECT * FROM executions WHERE account = 'real' AND ticker = ? AND side = ? AND note_id IS NULL ORDER BY executed_at, id",
+        (g["ticker"], g["side"]))]
+    rows = [r for r in rows if r["id"] not in claimed]
+    same = [r for r in rows if _day(r) == D]
+    date_fix = None
+    if same:
+        subset = _exact_subset(same, g["quantity"])
+        matches, action = (subset, "update") if subset else (same, "replace")
     else:
-        g["action"] = "skip"
-        g["match_note"] = f"Quantidade não bate (nota {g['quantity']:,.0f} x registrado {q:,.0f}). Revise e escolha."
+        near = [r for r in rows if _day(r) not in note_dates and abs(abs((datetime.fromisoformat(_day(r)) - datetime.fromisoformat(D)).days)) <= NEAR_DAYS
+                and abs(r["quantity"] - g["quantity"]) < EPS]
+        if not near:
+            return
+        near.sort(key=lambda r: abs((datetime.fromisoformat(_day(r)) - datetime.fromisoformat(D)).days))
+        matches, action, date_fix = [near[0]], "update", _day(near[0])
+    claimed.update(r["id"] for r in matches)
+    q = sum(r["quantity"] for r in matches)
+    avg = sum(r["quantity"] * r["price"] for r in matches) / q if q else 0.0
+    g["matches"] = [{k: r[k] for k in ("id", "quantity", "price", "fees", "fees_source", "executed_at", "signal_id")} for r in matches]
+    g["registered"] = {"quantity": q, "price": round(avg, 6), "fees": round(sum(r["fees"] for r in matches), 2), "date": date_fix or D}
+    g["action"] = action
+    changes = []
+    if action == "replace":
+        changes.append(f"quantidade {_fmt_q(q)} → {_fmt_q(g['quantity'])}" + (f" ({len(matches)} execuções viram 1)" if len(matches) > 1 else ""))
+    if abs(avg - g["price"]) > 0.00005:
+        changes.append(f"preço {_fmt_p(avg)} → {_fmt_p(g['price'])}")
+    if date_fix:
+        changes.append(f"data {_fmt_d(date_fix)} → {_fmt_d(D)}")
+    changes.append("custos reais")
+    g["match_note"] = ("Ajusta para a nota: " if action == "replace" else "Atualiza: ") + "; ".join(changes) + "."
 
 
 def build_preview(files: List[Tuple[str, bytes]], password: Optional[str] = None) -> Dict[str, Any]:
-    notes_out, errors = [], []
+    parsed, errors = [], []
+    for name, data in files:
+        try:
+            pages = read_pdf(data, password)
+        except ValueError as exc:
+            errors.append({"file": name, "error": str(exc)})
+            continue
+        notes = parse_pages(pages)
+        if not notes:
+            errors.append({"file": name, "error": "Nenhum negócio de Bovespa reconhecido (é uma nota SINACOR de ações/opções?)."})
+            continue
+        file_hash = hashlib.sha256(data).hexdigest()
+        parsed += [(name, file_hash, n) for n in notes]
+    parsed.sort(key=lambda x: (x[2]["trade_date"] or "", x[2]["number"]))
+
+    notes_out = []
+    claimed: set = set()
     with db.connection() as c:
-        for name, data in files:
-            try:
-                pages = read_pdf(data, password)
-            except ValueError as exc:
-                errors.append({"file": name, "error": str(exc)})
-                continue
-            file_hash = hashlib.sha256(data).hexdigest()
-            parsed = parse_pages(pages)
-            if not parsed:
-                errors.append({"file": name, "error": "Nenhum negócio de Bovespa reconhecido (é uma nota SINACOR de ações/opções?)."})
-                continue
-            for n in parsed:
-                exists = c.execute("SELECT id FROM notes WHERE broker = ? AND number = ? AND trade_date = ?",
-                                   (n["broker"], n["number"], n["trade_date"] or "")).fetchone()
-                groups = _group_trades(n)
-                for g in groups:
-                    _match(c, n, g)
-                notes_out.append({
-                    "file": name, "file_hash": file_hash, "broker": n["broker"], "number": n["number"],
-                    "trade_date": n["trade_date"], "settlement_date": n["fees"].get("settlement_date"),
-                    "fees": n["fees"].get("items", {}), "irrf": n["irrf"], "b3_fees": n["b3_fees"], "broker_fees": n["broker_fees"],
-                    "total_costs": n["total_costs"], "gross_value": n["gross_value"], "net_value": n["fees"].get("net_value"),
-                    "warnings": n["warnings"], "already_imported": bool(exists), "groups": groups,
-                    "trades": [{k: t[k] for k in ("side", "market", "spec", "obs", "quantity", "price", "value", "dc")} for t in n["trades"]],
-                })
-    notes_out.sort(key=lambda n: (n["trade_date"] or "", n["number"]))
+        imported = {(r["broker"], r["number"], r["trade_date"]) for r in c.execute("SELECT broker, number, trade_date FROM notes")}
+        note_dates = {r[0] for r in c.execute("SELECT DISTINCT trade_date FROM notes")} | {n["trade_date"] for _, _, n in parsed if n["trade_date"]}
+        seen_in_batch = set()
+        for name, file_hash, n in parsed:
+            key = (n["broker"], n["number"], n["trade_date"] or "")
+            exists = key in imported or key in seen_in_batch
+            seen_in_batch.add(key)
+            groups = _group_trades(n)
+            for g in groups:
+                if exists:
+                    g.update(matches=[], action="skip", match_note="Nota já importada.", registered=None)
+                else:
+                    _reconcile(c, n, g, claimed, note_dates)
+            notes_out.append({
+                "file": name, "file_hash": file_hash, "broker": n["broker"], "number": n["number"],
+                "trade_date": n["trade_date"], "settlement_date": n["fees"].get("settlement_date"),
+                "fees": n["fees"].get("items", {}), "irrf": n["irrf"], "irrf_day": n["fees"].get("irrf_day"),
+                "b3_fees": n["b3_fees"], "broker_fees": n["broker_fees"],
+                "total_costs": n["total_costs"], "gross_value": n["gross_value"], "net_value": n["fees"].get("net_value"),
+                "warnings": n["warnings"], "already_imported": exists, "groups": groups, "extras": [],
+                "trades": [{k: t[k] for k in ("side", "market", "spec", "obs", "quantity", "price", "value", "dc")} for t in n["trades"]],
+            })
+        # execuções registradas nos pregões das notas que não aparecem em nenhuma delas
+        first_by_date: Dict[str, Dict[str, Any]] = {}
+        for n in notes_out:
+            if not n["already_imported"] and n["trade_date"]:
+                first_by_date.setdefault(n["trade_date"], n)
+        for day, n in first_by_date.items():
+            for r in c.execute("SELECT * FROM executions WHERE account = 'real' AND note_id IS NULL ORDER BY executed_at, id"):
+                r = dict(r)
+                if r["id"] in claimed or _day(r) != day:
+                    continue
+                n["extras"].append({"id": r["id"], "ticker": r["ticker"], "side": r["side"], "quantity": r["quantity"],
+                                    "price": r["price"], "executed_at": r["executed_at"], "signal_id": r["signal_id"], "action": "keep"})
     return {"notes": notes_out, "errors": errors}
 
 
 # ---------------------------------------------------------------- gravação
+_EXEC_COLS = ("id", "signal_id", "ticker", "side", "quantity", "price", "fees", "executed_at", "asset_class", "note", "created_at",
+              "account", "source", "order_id", "note_id", "fees_source")
+
+
+def _backup(c, ids: List[int]) -> List[Dict[str, Any]]:
+    if not ids:
+        return []
+    return [{k: r[k] for k in _EXEC_COLS} for r in c.execute(f"SELECT * FROM executions WHERE id IN ({','.join('?' * len(ids))})", ids)]
+
+
+def _with_date(executed_at: str, day: str) -> str:
+    """Mesma hora, outro dia (pregão da nota)."""
+    dt = to_brt(executed_at) or datetime.fromisoformat(f"{day}T10:00:00-03:00")
+    y, m, d = map(int, day.split("-"))
+    return dt.replace(year=y, month=m, day=d).isoformat(timespec="seconds")
+
+
+def _line_prices(rows: List[Dict[str, Any]], lines: List[Dict[str, Any]]) -> Optional[List[float]]:
+    """Se cada execução tem um negócio da nota com a mesma quantidade, usa o preço de cada negócio."""
+    pool = list(lines or [])
+    out = []
+    for r in rows:
+        hit = next((ln for ln in pool if abs(ln["quantity"] - r["quantity"]) < EPS), None)
+        if hit is None:
+            return None
+        pool.remove(hit)
+        out.append(float(hit["price"]))
+    return out
+
+
+def _apply_group(c, note_id: int, day: str, g: Dict[str, Any], undo: Dict[str, Any]) -> str:
+    ids = [m["id"] for m in g.get("matches") or []]
+    rows = [dict(r) for r in c.execute(f"SELECT * FROM executions WHERE id IN ({','.join('?' * len(ids))}) ORDER BY executed_at, id", ids)] if ids else []
+    if len(rows) != len(ids):
+        raise ValueError("as execuções mudaram desde a leitura da nota — leia a nota de novo")
+    undo["updated"] += _backup(c, ids)
+    if g["action"] == "replace" or (g["action"] == "update" and len(rows) == 1):
+        keep, extra = rows[0], rows[1:]
+        c.execute("UPDATE executions SET quantity = ?, price = ?, fees = ?, executed_at = ?, note_id = ?, fees_source = 'note' WHERE id = ?",
+                  (float(g["quantity"]), round(float(g["price"]), 6), round(float(g["fees"]), 2), _with_date(keep["executed_at"], day),
+                   note_id, keep["id"]))
+        for r in extra:  # várias execuções do dia viram uma só, com os números da nota
+            undo["fills"] += [[f["id"], r["id"]] for f in c.execute("SELECT id FROM order_fills WHERE execution_id = ?", (r["id"],))]
+            c.execute("UPDATE order_fills SET execution_id = ? WHERE execution_id = ?", (keep["id"], r["id"]))
+            c.execute("DELETE FROM executions WHERE id = ?", (r["id"],))
+        return "replaced" if g["action"] == "replace" else "updated"
+    # update com várias execuções: mesmo total — cada uma recebe o preço do seu negócio (ou o médio) e custos rateados
+    prices = _line_prices(rows, g.get("lines")) or [float(g["price"])] * len(rows)
+    total = sum(r["quantity"] * p for r, p in zip(rows, prices)) or 1.0
+    remaining = round(float(g["fees"]), 2)
+    for i, (r, p) in enumerate(zip(rows, prices)):
+        share = remaining if i == len(rows) - 1 else round(float(g["fees"]) * r["quantity"] * p / total, 2)
+        remaining = round(remaining - share, 2)
+        c.execute("UPDATE executions SET price = ?, fees = ?, executed_at = ?, note_id = ?, fees_source = 'note' WHERE id = ?",
+                  (round(p, 6), share, _with_date(r["executed_at"], day), note_id, r["id"]))
+    return "updated"
+
+
+def _delete_extra(c, exec_id: int, undo: Dict[str, Any]) -> bool:
+    rows = _backup(c, [exec_id])
+    if not rows:
+        return False
+    undo["deleted"] += rows
+    undo["fills"] += [[f["id"], exec_id] for f in c.execute("SELECT id FROM order_fills WHERE execution_id = ?", (exec_id,))]
+    c.execute("UPDATE order_fills SET execution_id = NULL WHERE execution_id = ?", (exec_id,))
+    c.execute("DELETE FROM executions WHERE id = ?", (exec_id,))
+    sid = rows[0]["signal_id"]
+    if sid and not c.execute("SELECT 1 FROM executions WHERE signal_id = ? AND account = 'real'", (sid,)).fetchone():
+        c.execute("DELETE FROM decisions WHERE signal_id = ? AND status = 'executed'", (sid,))
+    return True
+
+
 def apply_preview(payload: Dict[str, Any], update_estimates: bool = True) -> Dict[str, Any]:
-    stats = {"notes": 0, "updated": 0, "created": 0, "skipped": 0, "errors": []}
+    stats = {"notes": 0, "updated": 0, "replaced": 0, "created": 0, "deleted": 0, "skipped": 0, "errors": []}
     for n in sorted(payload.get("notes", []), key=lambda n: (n.get("trade_date") or "", n.get("number") or "")):
         if n.get("already_imported") or not n.get("trade_date"):
             stats["skipped"] += len(n.get("groups", []))
             continue
-        with db.transaction() as c:
-            if c.execute("SELECT 1 FROM notes WHERE broker = ? AND number = ? AND trade_date = ?", (n["broker"], n["number"], n["trade_date"])).fetchone():
-                stats["skipped"] += len(n.get("groups", []))
-                continue
-            cur = c.execute(
-                "INSERT INTO notes(broker, number, trade_date, settlement_date, file_name, file_hash, gross_value, net_value, total_costs, "
-                "brokerage, b3_fees, taxes, irrf, fees_json, trades_json, imported_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (n["broker"], n["number"], n["trade_date"], n.get("settlement_date"), n.get("file"), n.get("file_hash"),
-                 n.get("gross_value"), n.get("net_value"), n.get("total_costs"), (n.get("fees") or {}).get("corretagem", 0.0),
-                 n.get("b3_fees"), (n.get("fees") or {}).get("impostos", 0.0), n.get("irrf"),
-                 json.dumps(n.get("fees") or {}), json.dumps(n.get("groups") or [], ensure_ascii=False), now_iso()),
-            )
-            note_id = cur.lastrowid
-            # compras antes das vendas (day trade na mesma nota)
-            for g in sorted(n.get("groups", []), key=lambda g: 0 if g.get("side") == "BUY" else 1):
-                action = g.get("action")
-                ticker = b3_tickers.clean_ticker(g.get("ticker"))
-                try:
-                    if action == "update" and g.get("matches"):
-                        _apply_update(c, note_id, g)
-                        stats["updated"] += len(g["matches"])
-                    elif action == "create" and ticker:
+        day = n["trade_date"]
+        try:
+            with db.transaction() as c:
+                if c.execute("SELECT 1 FROM notes WHERE broker = ? AND number = ? AND trade_date = ?", (n["broker"], n["number"], day)).fetchone():
+                    stats["skipped"] += len(n.get("groups", []))
+                    continue
+                cur = c.execute(
+                    "INSERT INTO notes(broker, number, trade_date, settlement_date, file_name, file_hash, gross_value, net_value, total_costs, "
+                    "brokerage, b3_fees, taxes, irrf, irrf_day, fees_json, trades_json, imported_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (n["broker"], n["number"], day, n.get("settlement_date"), n.get("file"), n.get("file_hash"),
+                     n.get("gross_value"), n.get("net_value"), n.get("total_costs"), (n.get("fees") or {}).get("corretagem", 0.0),
+                     n.get("b3_fees"), (n.get("fees") or {}).get("impostos", 0.0), n.get("irrf"), n.get("irrf_day"),
+                     json.dumps(n.get("fees") or {}), json.dumps(n.get("groups") or [], ensure_ascii=False), now_iso()),
+                )
+                note_id = cur.lastrowid
+                undo: Dict[str, Any] = {"updated": [], "deleted": [], "fills": []}
+                counts = {"updated": 0, "replaced": 0, "created": 0, "deleted": 0, "skipped": 0}
+                # compras antes das vendas (day trade na mesma nota)
+                for g in sorted(n.get("groups", []), key=lambda g: 0 if g.get("side") == "BUY" else 1):
+                    action = g.get("action")
+                    ticker = b3_tickers.clean_ticker(g.get("ticker"))
+                    if action in ("update", "replace") and g.get("matches"):
+                        counts[_apply_group(c, note_id, day, g, undo)] += 1
+                    elif action in ("create", "update", "replace") and ticker:
                         journal.add_execution(
                             {"ticker": ticker, "side": g["side"], "quantity": g["quantity"], "price": g["price"], "fees": g["fees"],
-                             "executed_at": f"{n['trade_date']}T10:00:00-03:00",
-                             "asset_class": b3_tickers.asset_class(None, ticker),
+                             "executed_at": f"{day}T10:00:00-03:00", "asset_class": b3_tickers.asset_class(None, ticker),
                              "note": f"Importado da nota {n['broker']} nº {n['number']}"},
-                            account="real", source="note", note_id=note_id, fees_source="note", conn=c,
+                            allow_short=True, account="real", source="note", note_id=note_id, fees_source="note", conn=c,
                         )
-                        stats["created"] += 1
+                        counts["created"] += 1
                     else:
-                        stats["skipped"] += 1
-                except ValueError as exc:
-                    stats["errors"].append(f"Nota {n['number']} · {ticker or g.get('spec')}: {exc}")
-            stats["notes"] += 1
+                        counts["skipped"] += 1
+                for x in n.get("extras") or []:
+                    if x.get("action") == "delete" and _delete_extra(c, int(x["id"]), undo):
+                        counts["deleted"] += 1
+                c.execute("UPDATE notes SET undo_json = ? WHERE id = ?", (json.dumps(undo, ensure_ascii=False), note_id))
+        except ValueError as exc:
+            stats["errors"].append(f"Nota {n.get('number')} ({_fmt_d(day)}): {exc} — nada desta nota foi gravado.")
+            continue
+        for k, v in counts.items():
+            stats[k] += v
+        stats["notes"] += 1
     if update_estimates and stats["notes"]:
         stats["calibration"] = fee_calibration(apply=True)
     return stats
 
 
-def _apply_update(c, note_id: int, g: Dict[str, Any]) -> None:
-    ids = [m["id"] for m in g["matches"]]
-    rows = [dict(r) for r in c.execute(f"SELECT * FROM executions WHERE id IN ({','.join('?' * len(ids))})", ids)]
-    total = sum(r["quantity"] * r["price"] for r in rows) or 1.0
-    fix_price = len(rows) == 1
-    remaining = round(float(g["fees"]), 2)
-    for i, r in enumerate(rows):
-        share = remaining if i == len(rows) - 1 else round(g["fees"] * (r["quantity"] * r["price"]) / total, 2)
-        remaining = round(remaining - share, 2)
-        price = float(g["price"]) if fix_price else r["price"]
-        c.execute("UPDATE executions SET fees = ?, price = ?, note_id = ?, fees_source = 'note' WHERE id = ?",
-                  (share, round(price, 6), note_id, r["id"]))
-
-
-def list_notes(limit: int = 50) -> List[Dict[str, Any]]:
+def list_notes(limit: int = 200) -> List[Dict[str, Any]]:
     with db.connection() as c:
-        rows = [dict(r) for r in c.execute("SELECT id, broker, number, trade_date, gross_value, total_costs, b3_fees, brokerage, irrf, net_value, imported_at "
-                                           "FROM notes ORDER BY trade_date DESC, id DESC LIMIT ?", (limit,))]
+        rows = [dict(r) for r in c.execute("SELECT id, broker, number, trade_date, gross_value, total_costs, b3_fees, brokerage, irrf, irrf_day, "
+                                           "net_value, imported_at FROM notes ORDER BY trade_date DESC, id DESC LIMIT ?", (limit,))]
         for r in rows:
             r["executions"] = c.execute("SELECT COUNT(*) FROM executions WHERE note_id = ?", (r["id"],)).fetchone()[0]
     return rows
 
 
 def delete_note(note_id: int) -> Dict[str, int]:
-    """Desfaz a importação: apaga execuções criadas pela nota e desvincula as atualizadas (os custos ficam)."""
+    """Desfaz a importação: apaga o que a nota criou e devolve as execuções ajustadas/excluídas ao estado anterior."""
     with db.transaction() as c:
-        if not c.execute("SELECT 1 FROM notes WHERE id = ?", (note_id,)).fetchone():
+        row = c.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
+        if not row:
             raise KeyError(note_id)
+        undo = json.loads(row["undo_json"] or "null")
         created = c.execute("DELETE FROM executions WHERE note_id = ? AND source = 'note'", (note_id,)).rowcount
+        restored = 0
+        if undo:
+            for r in undo.get("updated", []) + undo.get("deleted", []):
+                exists = c.execute("SELECT 1 FROM executions WHERE id = ?", (r["id"],)).fetchone()
+                if exists:
+                    c.execute("UPDATE executions SET quantity = ?, price = ?, fees = ?, executed_at = ?, note_id = ?, fees_source = ? WHERE id = ?",
+                              (r["quantity"], r["price"], r["fees"], r["executed_at"], r["note_id"], r["fees_source"], r["id"]))
+                else:
+                    c.execute(f"INSERT INTO executions({','.join(_EXEC_COLS)}) VALUES({','.join('?' * len(_EXEC_COLS))})",
+                              [r[k] for k in _EXEC_COLS])
+                restored += 1
+            for fill_id, exec_id in undo.get("fills", []):
+                c.execute("UPDATE order_fills SET execution_id = ? WHERE id = ?", (exec_id, fill_id))
+        # notas antigas (sem histórico para desfazer): só desvincula
         unlinked = c.execute("UPDATE executions SET note_id = NULL, fees_source = 'manual' WHERE note_id = ?", (note_id,)).rowcount
         c.execute("DELETE FROM notes WHERE id = ?", (note_id,))
-    return {"deleted_executions": created, "unlinked": unlinked}
+    return {"deleted_executions": created, "restored": restored, "unlinked": unlinked}
 
 
 # ---------------------------------------------------------------- calibração das taxas
@@ -493,13 +665,45 @@ def fee_calibration(apply: bool = False) -> Dict[str, Any]:
     return result
 
 
-def irrf_by_month() -> Dict[str, float]:
+def irrf_by_day() -> Dict[str, Dict[str, Optional[float]]]:
+    """IRRF das notas por pregão: {'AAAA-MM-DD': {'swing': x, 'day': y | None}}."""
+    out: Dict[str, Dict[str, Optional[float]]] = {}
     with db.connection() as c:
-        out: Dict[str, float] = defaultdict(float)
-        for r in c.execute("SELECT trade_date, irrf FROM notes WHERE irrf IS NOT NULL"):
-            out[r["trade_date"][:7]] += float(r["irrf"] or 0)
-    return dict(out)
+        for r in c.execute("SELECT trade_date, irrf, irrf_day FROM notes"):
+            d = out.setdefault(r["trade_date"], {"swing": 0.0, "day": None})
+            d["swing"] = round((d["swing"] or 0.0) + float(r["irrf"] or 0.0), 2)
+            if r["irrf_day"] is not None:
+                d["day"] = round((d["day"] or 0.0) + float(r["irrf_day"]), 2)
+    return out
+
+
+def coverage(conn=None) -> Dict[str, Any]:
+    """
+    Quais pregões com operações (conta real) já têm nota importada. Um pregão está coberto quando todas as
+    execuções dele vieram de/foram conferidas com uma nota; um mês só "fecha" com todos os pregões cobertos.
+    """
+    days: Dict[str, Dict[str, Any]] = {}
+    with db.connection(conn) as c:
+        for r in c.execute("SELECT ticker, executed_at, note_id FROM executions WHERE account = 'real'"):
+            d = days.setdefault(_day(dict(r)), {"executions": 0, "with_note": 0, "tickers": set()})
+            d["executions"] += 1
+            if r["note_id"]:
+                d["with_note"] += 1
+            else:
+                d["tickers"].add(r["ticker"])
+    months: Dict[str, Dict[str, Any]] = {}
+    for day in sorted(days):
+        d = days[day]
+        m = months.setdefault(day[:7], {"days": 0, "covered": 0, "missing": []})
+        m["days"] += 1
+        if d["with_note"] == d["executions"]:
+            m["covered"] += 1
+        else:
+            m["missing"].append({"date": day, "executions": d["executions"] - d["with_note"], "tickers": sorted(d["tickers"])})
+    for m in months.values():
+        m["complete"] = m["days"] > 0 and m["covered"] == m["days"]
+    return {"months": months, "days_total": len(days), "days_covered": sum(m["covered"] for m in months.values())}
 
 
 __all__ = ["read_pdf", "parse_pages", "parse_trade_line", "resolve_ticker", "build_preview", "apply_preview",
-           "list_notes", "delete_note", "fee_calibration", "irrf_by_month", "NotePasswordError"]
+           "list_notes", "delete_note", "fee_calibration", "irrf_by_day", "coverage", "NotePasswordError"]

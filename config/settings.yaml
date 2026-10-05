@@ -3,7 +3,7 @@
 # ficam na tela Configurações do app (gravadas em database/app.db).
 app:
   name: Copiloto de Trades
-  version: 2.2.0
+  version: 2.3.0
 
 trading_floors:
   supabase_url: https://ayvqtffpfmfescxzqifp.supabase.co

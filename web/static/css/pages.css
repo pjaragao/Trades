@@ -111,3 +111,13 @@
 .settings-grid .span-all { grid-column: 1 / -1; }
 .form-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .form-grid-3 { grid-template-columns: 1fr; } }
+
+/* Notas e IR */
+.ir-sim .lbl { font-size: 0.66rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.ir-sim .val { font-family: var(--mono); font-weight: 650; margin: 2px 0; }
+.ir-table tr.open td { background: var(--surface-hover); }
+.ir-table tr[data-month] .icon { transition: transform 0.15s; color: var(--text-faint); }
+.ir-table tr.open .icon { transform: rotate(-90deg); }
+.ir-detail h4 { margin: 0 0 var(--s2); font-size: var(--fs-sm); }
+.ir-detail .kv dd { white-space: nowrap; }
+.notes-diff td .cell-sub { white-space: normal; }

@@ -60,22 +60,19 @@ function journal(trades) {
     </tr>`).join('')}</tbody></table></div>`;
 }
 
-function taxTable(tax) {
-  const rows = tax.months.slice().reverse();
-  if (!rows.length) return '<div class="empty compact"><p>Sem operações para apurar.</p></div>';
-  return `<div class="table-wrap"><table class="table tax-table">
-    <thead><tr><th>Mês</th><th class="r">Vendas ações</th><th class="r">Swing</th><th class="r">Day trade</th><th class="r">Base swing</th><th class="r">Base DT</th><th class="r">IRRF est.</th><th class="r">DARF</th><th>Vencimento</th><th class="r">Prejuízo a compensar</th></tr></thead>
-    <tbody>${rows.map((m) => `<tr>
-      <td class="nowrap"><strong>${esc(m.month.slice(5))}/${esc(m.month.slice(0, 4))}</strong>${m.stock_exempt ? ' <span class="badge badge-ok badge-plain" title="Vendas de ações até R$ 20 mil">isento ações</span>' : ''}</td>
-      <td class="num r">${f.brl(m.stock_sales)}</td>
-      <td class="num r ${f.tone(m.stock_swing_pnl + m.other_swing_pnl)}">${f.brl(m.stock_swing_pnl + m.other_swing_pnl, { sign: true })}</td>
-      <td class="num r ${f.tone(m.day_trade_pnl)}">${f.brl(m.day_trade_pnl, { sign: true })}</td>
-      <td class="num r">${f.brl(m.swing_base)}</td><td class="num r">${f.brl(m.day_base)}</td>
-      <td class="num r">${f.brl(m.irrf_estimate)}</td>
-      <td class="num r month-pay ${m.darf_value ? 'warn-text' : 'faint'}">${m.darf_value ? f.brl(m.darf_value) : (m.carried_to_next ? `acumula ${f.brl(m.carried_to_next)}` : '—')}</td>
-      <td class="nowrap">${m.darf_value ? esc(f.date(m.due_date + 'T12:00:00-03:00', { year: true })) : '—'}</td>
-      <td class="num r faint">${m.swing_loss_carry || m.day_loss_carry ? `${f.brl(m.swing_loss_carry)} / ${f.brl(m.day_loss_carry)} DT` : '—'}</td>
-    </tr>`).join('')}</tbody></table></div>`;
+function taxCard(ir) {
+  const nd = ir.next_darf;
+  const cov = ir.coverage;
+  return `<section class="section card">
+    <div class="card-head"><h2>${icon('receipt')} Imposto de renda</h2><a class="btn btn-sm" href="#/ir">Abrir Notas e IR</a></div>
+    <div class="card-body"><div class="grid grid-3">
+      <div><div class="muted">Próximo DARF</div><div class="mono ${nd ? 'warn-text' : ''}" style="font-size:1.2rem">${nd ? f.brl(nd.value) : 'nada a pagar'}</div>
+        ${nd ? `<div class="hint">vence ${esc(f.date(nd.due_date + 'T12:00:00-03:00', { year: true }))} · ${nd.status === 'fechado' ? 'fechado com notas' : 'estimado'}</div>` : ''}</div>
+      <div><div class="muted">Prejuízo a compensar</div><div class="mono" style="font-size:1.2rem">${f.brl(ir.loss_carry.swing + ir.loss_carry.day)}</div>
+        <div class="hint">swing ${f.brl(ir.loss_carry.swing)} · day trade ${f.brl(ir.loss_carry.day)}</div></div>
+      <div><div class="muted">Notas de corretagem</div><div class="mono" style="font-size:1.2rem">${cov.days_covered} de ${cov.days_total} pregões</div>
+        <div class="hint">${cov.missing.length ? `faltam ${cov.missing.length} — sem elas o IR é estimado` : 'IR fechado com as notas'}</div></div>
+    </div></div></section>`;
 }
 
 let chart;
@@ -128,7 +125,7 @@ export default {
       root.querySelector('#csv-ex').href = `/api/export/execucoes.csv?account=${account}`;
       res.innerHTML = loading();
       try {
-        const [r, tax] = await Promise.all([get(`/api/results${qs({ ...range(period), account })}`), get('/api/results/tax')]);
+        const [r, ir] = await Promise.all([get(`/api/results${qs({ ...range(period), account })}`), account === 'real' ? get('/api/ir') : null]);
         res.innerHTML = `
           ${kpis(r)}
           <section class="section card">
@@ -137,14 +134,7 @@ export default {
           </section>
           <section class="section"><div class="section-title"><h2>Desempenho por analista</h2></div><div class="card">${byTrader(r.by_trader)}</div></section>
           <section class="section"><div class="section-title"><h2>Diário de operações <span class="count">${r.closed_trades.length}</span></h2></div><div class="card">${journal(r.closed_trades)}</div></section>
-          ${account === 'real' ? `<section class="section">
-            <div class="section-title"><h2>Imposto de renda (DARF) <span class="badge badge-est">Estimativa</span></h2>
-              <span class="row"><span class="muted">Total a pagar no histórico: <strong class="mono">${f.brl(tax.total_darf)}</strong></span>
-              <button class="btn btn-sm" data-notes>${icon('download')} Importar notas de corretagem</button></span></div>
-            <div class="card">${taxTable(tax)}</div>
-            <ul class="notes mt-3">${tax.notes.map((n) => `<li class="note info">${icon('info')}<span>${esc(n)}</span></li>`).join('')}
-              <li class="note info">${icon('info')}<span>Swing: 15% · Day trade: 20% · Opções não têm isenção de R$ 20 mil · Código DARF 6015 · Valores abaixo de R$ 10 acumulam.</span></li></ul>
-          </section>` : ''}`;
+          ${account === 'real' && ir ? taxCard(ir) : ''}`;
         const cv = res.querySelector('#eq');
         if (cv) drawChart(cv, r.equity_curve, r.capital);
       } catch (e) {
@@ -152,11 +142,6 @@ export default {
       }
     };
 
-    root.addEventListener('click', async (e) => {
-      if (!e.target.closest('[data-notes]')) return;
-      const { openNotesImport } = await import('../components/notes_import.js');
-      openNotesImport();
-    });
     root.querySelector('#acct').addEventListener('click', (e) => {
       const b = e.target.closest('[data-a]');
       if (!b) return;

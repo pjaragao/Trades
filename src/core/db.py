@@ -217,6 +217,11 @@ MIGRATIONS = [
     ALTER TABLE quotes ADD COLUMN quote_time TEXT;
     ALTER TABLE quotes ADD COLUMN change_pct REAL;
     """,
+    # v4 — conciliação completa pelas notas (desfazer restaura o histórico) e IRRF de day trade da nota
+    """
+    ALTER TABLE notes ADD COLUMN undo_json TEXT;
+    ALTER TABLE notes ADD COLUMN irrf_day REAL;
+    """,
 ]
 
 

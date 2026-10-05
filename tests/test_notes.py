@@ -147,7 +147,7 @@ def test_preview_matches_and_apply_updates_fees_and_creates_missing(tmp_db):
     prev = bn.build_preview([("xp.pdf", make_pdf([XP_PAGE]))])
     note = prev["notes"][0]
     g = {x["ticker"]: x for x in note["groups"]}
-    assert g["NATUK800"]["action"] == "update" and "preço corrigido" in g["NATUK800"]["match_note"]
+    assert g["NATUK800"]["action"] == "update" and "preço 0,4 → 0,39" in g["NATUK800"]["match_note"]
     assert g["PETR4"]["action"] == "create"
 
     res = bn.apply_preview(prev)
@@ -175,7 +175,9 @@ def test_preview_matches_and_apply_updates_fees_and_creates_missing(tmp_db):
     # desfazer
     nid = bn.list_notes()[0]["id"]
     out = bn.delete_note(nid)
-    assert out == {"deleted_executions": 1, "unlinked": 1}
+    assert out == {"deleted_executions": 1, "restored": 1, "unlinked": 0}
+    natu = next(e for e in journal.list_executions() if e["ticker"] == "NATUK800")
+    assert natu["price"] == pytest.approx(0.40) and natu["fees"] == pytest.approx(0.66) and natu["fees_source"] == "estimate"
 
 
 def test_calibration_from_single_class_note(tmp_db):
@@ -204,6 +206,6 @@ def test_api_endpoints(tmp_db):
     assert len(prev["notes"]) == 1
     r = client.post("/api/notes/apply", json={"preview": prev, "update_estimates": False})
     body = r.get_json()
-    # NATUK800 é criada; a venda de PETR4 sem posição anterior é recusada (a descoberto)
-    assert r.status_code == 200 and body["created"] == 1 and len(body["errors"]) == 1
+    # a nota é a verdade: as duas linhas viram execuções (a venda de PETR4 abre posição vendida)
+    assert r.status_code == 200 and body["created"] == 2 and not body["errors"]
     assert len(client.get("/api/notes").get_json()["notes"]) == 1

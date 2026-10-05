@@ -4,23 +4,48 @@ import * as f from '../format.js';
 import { emit, state } from '../state.js';
 import { confirmDialog, esc, icon, loading, openModal, toast, toastError } from '../ui.js';
 
-const ACTIONS = { update: 'Aplicar custos/preço', create: 'Criar execução', skip: 'Ignorar' };
+const ACTIONS = {
+  update: 'Atualizar com a nota', replace: 'Substituir pelos dados da nota', create: 'Criar execução', skip: 'Ignorar',
+};
+const day = (iso) => f.date(`${iso}T12:00:00-03:00`);
+
+function actionOptions(g) {
+  const keys = g.matches && g.matches.length ? [g.action === 'replace' ? 'replace' : 'update', 'skip'] : ['create', 'skip'];
+  if (g.action === 'skip' && !keys.includes('skip')) keys.push('skip');
+  return keys.map((k) => `<option value="${k}" ${g.action === k ? 'selected' : ''}>${ACTIONS[k]}</option>`).join('');
+}
 
 function groupRow(n, g, ni, gi) {
   const ticker = g.ticker
     ? `<span class="ticker">${esc(g.ticker)}</span>${g.resolved_by === 'nome' ? `<span class="cell-sub">${esc(g.spec)}</span>` : ''}`
     : `<input class="input num" style="height:30px;max-width:120px" data-ticker="${ni}:${gi}" placeholder="Ticker" title="${esc(g.spec)}"><span class="cell-sub">${esc(g.spec)}</span>`;
+  const r = g.registered;
+  const reg = r
+    ? `${f.qty(r.quantity)} × ${f.price(r.price)}${r.date !== n.trade_date ? `<span class="cell-sub warn-text">em ${esc(day(r.date))}</span>` : ''}<span class="cell-sub">custos ${f.brl(r.fees)}</span>`
+    : '<span class="faint">—</span>';
+  const diffQ = r && Math.abs(r.quantity - g.quantity) > 1e-6;
+  const diffP = r && Math.abs(r.price - g.price) > 0.00005;
   return `<tr>
     <td>${ticker}${g.day_trade ? ' <span class="badge badge-plain">DT</span>' : ''}</td>
     <td><span class="badge ${g.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${g.side === 'BUY' ? 'C' : 'V'}</span></td>
-    <td class="num r">${f.qty(g.quantity)}</td>
-    <td class="num r">${f.price(g.price)}</td>
-    <td class="num r">${f.brl(g.value)}</td>
+    <td class="num r"><span class="${diffQ ? 'warn-text' : ''}">${f.qty(g.quantity)}</span> × <span class="${diffP ? 'warn-text' : ''}">${f.price(g.price)}</span><span class="cell-sub">${f.brl(g.value)}</span></td>
     <td class="num r">${f.brl(g.fees)}</td>
-    <td style="min-width:170px"><select class="select" style="height:30px" data-action="${ni}:${gi}" ${n.already_imported ? 'disabled' : ''}>
-      ${Object.entries(ACTIONS).filter(([k]) => k !== 'update' || (g.matches && g.matches.length)).map(([k, l]) => `<option value="${k}" ${g.action === k ? 'selected' : ''}>${l}</option>`).join('')}
-    </select><span class="cell-sub">${esc(g.match_note || '')}</span></td>
+    <td class="num r">${reg}</td>
+    <td style="min-width:180px;max-width:260px"><select class="select" style="height:30px" data-action="${ni}:${gi}" ${n.already_imported ? 'disabled' : ''}>${actionOptions(g)}</select>
+      <span class="cell-sub">${esc(g.match_note || '')}</span></td>
   </tr>`;
+}
+
+function extrasBlock(n, ni) {
+  if (!n.extras || !n.extras.length) return '';
+  return `<div class="card-body"><div class="note warning">${icon('alert')}<span>Registradas no pregão de ${esc(day(n.trade_date))}, mas fora desta nota
+      (podem ser de outra corretora — importe a outra nota ou exclua o que não aconteceu):</span></div></div>
+    <div class="table-wrap"><table class="table"><tbody>${n.extras.map((x, xi) => `<tr>
+      <td><span class="ticker">${esc(x.ticker)}</span></td>
+      <td><span class="badge ${x.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${x.side === 'BUY' ? 'C' : 'V'}</span></td>
+      <td class="num r">${f.qty(x.quantity)} × ${f.price(x.price)}</td><td class="nowrap">${esc(f.dateTime(x.executed_at))}</td>
+      <td style="min-width:170px"><select class="select" style="height:30px" data-extra="${ni}:${xi}">
+        <option value="keep" selected>Manter</option><option value="delete">Excluir do histórico</option></select></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function noteCard(n, ni) {
@@ -29,13 +54,14 @@ function noteCard(n, ni) {
     <div class="card-head"><h3>${esc(n.broker)} · nota ${esc(n.number)} · ${n.trade_date ? esc(f.date(n.trade_date + 'T12:00:00-03:00', { year: true })) : 'sem data'}</h3>
       ${n.already_imported ? '<span class="badge">já importada</span>' : `<span class="hint">${esc(n.file)}</span>`}</div>
     ${n.warnings.length ? `<div class="card-body"><ul class="notes">${n.warnings.map((w) => `<li class="note warning">${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul></div>` : ''}
-    <div class="table-wrap"><table class="table"><thead><tr><th>Ativo</th><th>Lado</th><th class="r">Qtd</th><th class="r">Preço médio</th><th class="r">Valor</th><th class="r">Custos rateados</th><th>O que fazer</th></tr></thead>
+    <div class="table-wrap"><table class="table notes-diff"><thead><tr><th>Ativo</th><th>Lado</th><th class="r">Nota: qtd × preço</th><th class="r">Custos reais</th><th class="r">Registrado por você</th><th>O que fazer</th></tr></thead>
       <tbody>${n.groups.map((g, gi) => groupRow(n, g, ni, gi)).join('')}</tbody></table></div>
+    ${n.already_imported ? '' : extrasBlock(n, ni)}
     <div class="card-foot"><dl class="kv">
       <dt>Taxas B3 (liquidação + registro + emolumentos…)</dt><dd>${f.brl(n.b3_fees)}</dd>
       <dt>Corretagem + ISS + outros</dt><dd>${f.brl(n.broker_fees)}</dd>
       <dt>Custos totais</dt><dd>${f.brl(n.total_costs)} (${n.gross_value ? f.pct(n.total_costs / n.gross_value * 100, { sign: false, dec: 3 }) : '—'} do volume)</dd>
-      <dt>IRRF ("dedo-duro")</dt><dd>${f.brl(n.irrf)}</dd>
+      <dt>IRRF ("dedo-duro")</dt><dd>${f.brl(n.irrf)}${n.irrf_day != null ? ` · day trade ${f.brl(n.irrf_day)}` : ''}</dd>
       <dt>Líquido${n.settlement_date ? ` para ${esc(n.settlement_date)}` : ''}</dt><dd>${f.brl(n.net_value)}</dd>
     </dl></div>
   </div>`;
@@ -47,8 +73,9 @@ export async function openNotesImport() {
   try { existing = await get('/api/notes'); } catch { /* segue */ }
   const cal = existing.calibration;
   m.setBody(`
-    <p class="muted">Envie os PDFs das notas (XP, Genial ou outra corretora no padrão SINACOR). O Copiloto lê os negócios e os custos,
-      aplica os <strong>custos reais</strong> às suas execuções (rateados pelo valor), cria as que faltam e recalcula as taxas estimadas.</p>
+    <p class="muted">Envie os PDFs das notas (XP, Genial ou outra corretora no padrão SINACOR). <strong>A nota é a verdade:</strong> quantidade,
+      preço, data do pregão e <strong>custos reais</strong> (rateados pelo valor) passam a valer no seu histórico; o que falta é criado e o que
+      você registrou no pregão mas não está na nota aparece para manter ou excluir. Tudo pode ser desfeito. Importe em ordem cronológica.</p>
     <div class="form-grid mt-4">
       <div class="field"><label for="nf">Arquivos PDF</label><input id="nf" class="input" type="file" accept="application/pdf" multiple style="padding-top:7px"></div>
       <div class="field"><label for="np">Senha do PDF <span class="faint">(se houver)</span></label><input id="np" class="input" type="password" autocomplete="off" placeholder="XP: 3 primeiros dígitos do CPF">
@@ -99,6 +126,10 @@ export async function openNotesImport() {
       const [ni, gi] = s.dataset.action.split(':').map(Number);
       preview.notes[ni].groups[gi].action = s.value;
     });
+    m.el.querySelectorAll('[data-extra]').forEach((s) => {
+      const [ni, xi] = s.dataset.extra.split(':').map(Number);
+      preview.notes[ni].extras[xi].action = s.value;
+    });
     m.el.querySelectorAll('[data-ticker]').forEach((inp) => {
       const [ni, gi] = inp.dataset.ticker.split(':').map(Number);
       const t = inp.value.trim().toUpperCase();
@@ -109,7 +140,8 @@ export async function openNotesImport() {
     try {
       const r = await post('/api/notes/apply', { preview, update_estimates: el('#ncal').checked });
       m.close();
-      toast(`${r.notes} nota(s) importada(s): ${r.updated} execução(ões) com custo real, ${r.created} criada(s)${r.errors.length ? `, ${r.errors.length} com erro` : ''}.`, r.errors.length ? 'warning' : 'success', 8000);
+      const parts = [`${r.updated} atualizada(s)`, r.replaced ? `${r.replaced} substituída(s)` : '', `${r.created} criada(s)`, r.deleted ? `${r.deleted} excluída(s)` : ''].filter(Boolean);
+      toast(`${r.notes} nota(s) importada(s): ${parts.join(', ')}${r.errors.length ? ` · ${r.errors.length} com erro` : ''}.`, r.errors.length ? 'warning' : 'success', 8000);
       if (r.errors.length) r.errors.forEach((e) => toast(e, 'error', 10000));
       if (r.calibration && r.calibration.applied) {
         const s = await get('/api/settings');
@@ -125,7 +157,7 @@ export async function openNotesImport() {
   m.el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-del-note]');
     if (!b) return;
-    const ok = await confirmDialog({ title: 'Desfazer importação', message: 'Apagar as execuções criadas por esta nota e desvincular as demais (os custos já aplicados permanecem)?', confirmText: 'Desfazer', danger: true });
+    const ok = await confirmDialog({ title: 'Desfazer importação', message: 'Apagar as execuções criadas por esta nota e devolver as que ela ajustou ou excluiu ao estado anterior (quantidade, preço, data e custos)?', confirmText: 'Desfazer', danger: true });
     if (!ok) return;
     try { await del(`/api/notes/${b.dataset.delNote}`); m.close(); toast('Importação desfeita', 'info'); emit('data-changed'); } catch (err) { toastError(err); }
   });
