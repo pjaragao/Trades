@@ -5,7 +5,7 @@ from src import __version__
 from src.core import db
 from src.core.config import execution_flags, get_prefs
 from src.core.market_hours import market_status, now_brt, to_brt
-from src.services import alerts, journal, performance, portfolio, signals
+from src.services import alerts, journal, performance, portfolio, signals, similar
 from src.services.quotes import get_feed
 from src.services.signal_monitor import get_monitor
 from src.services.sizing import build_ticket, exit_ticket
@@ -73,13 +73,15 @@ def today():
         open_sigs = signals.open_followed(c)
     profiles = _profiles_index()
     fresh_hours = prefs["follow"]["fresh_hours"]
-    held_tickers = {p["ticker"] for p in positions}
+    linked = {sid for p in positions for sid in p["signal_ids"]}
 
     new_signals, reminders, inbox = [], [], 0
     for s in open_sigs:
         d = s.get("decision")
-        if s["ticker"] in held_tickers and not d:
+        if s["id"] in linked and not d:  # já é uma posição minha
             continue
+        # posição parecida (mesmo ativo-objeto) não esconde o sinal: ele aparece com o aviso
+        s["similar"] = similar.find(s, positions)
         if d is None:
             if s["age_hours"] is not None and s["age_hours"] <= fresh_hours:
                 s["ticket"] = ticket_for(s, prefs, exposure, profiles)

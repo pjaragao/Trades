@@ -77,10 +77,13 @@ export async function openSignalModal(id) {
     </div>`);
 
   bindTickets(m.el);
+  // os menus (Ignorar/Depois) abrem no fundo do modal, fora de m.el
+  m.el.parentElement.addEventListener('click', (e) => {
+    if (e.target.closest('.menu [data-reason], .menu [data-min]')) setTimeout(m.close, 50);
+  });
   if (sig.status === 'OPEN') watch([sig.ticker]); // sinal de analista não seguido: passa a ser acompanhado
   m.el.addEventListener('click', async (e) => {
     if (e.target.closest('[data-action=executed], [data-action=send]')) m.close();
-    if (e.target.closest('.menu [data-reason], .menu [data-min]')) setTimeout(m.close, 50);
     if (e.target.closest('[data-clear]')) {
       try {
         await post(`/api/signals/${encodeURIComponent(id)}/decision`, { status: 'clear' });

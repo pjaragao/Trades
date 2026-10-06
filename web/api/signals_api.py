@@ -51,7 +51,23 @@ def get_signal(signal_id):
     sig["ticket"] = ticket_for(sig, prefs, exposure, _profiles_index())
     sig["executions"] = journal.list_executions(signal_id=signal_id)
     sig["position"] = next((p for p in positions if signal_id in p["signal_ids"] or (p.get("signal") or {}).get("id") == signal_id), None)
+    from src.services import similar
+
+    sig["similar"] = similar.find(sig, positions) if sig["status"] == "OPEN" else []
     return jsonify(sig)
+
+
+@bp.post("/signals/<signal_id>/link-position")
+def link_position(signal_id):
+    """'É este trade': vincula a minha posição (ciclo) ao sinal e marca como executado."""
+    from src.services import auto_link
+
+    data = request.get_json(silent=True) or {}
+    with db.transaction() as c:
+        n = auto_link.link_cycle(c, signal_id, str(data.get("cycle_id") or ""))
+    if not n:
+        raise ValueError("Nada para vincular: a posição não tem execuções sem sinal no mesmo lado.")
+    return jsonify({"linked": n})
 
 
 @bp.get("/signals/<signal_id>/ticket")

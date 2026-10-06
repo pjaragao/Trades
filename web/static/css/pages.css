@@ -39,7 +39,7 @@
 .ticket-actions .btn-primary { flex: 1 1 auto; }
 .ticket-actions .menu-wrap { position: relative; }
 
-.menu { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 40; min-width: 210px; background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 4px; animation: rise 0.12s var(--ease); }
+.menu { position: fixed; z-index: 70; min-width: 210px; background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 4px; animation: rise 0.12s var(--ease); }
 .menu button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; border: 0; background: none; color: var(--text); border-radius: 7px; cursor: pointer; text-align: left; font-size: var(--fs-sm); }
 .menu button:hover { background: var(--surface-hover); }
 .menu .menu-title { padding: 6px 10px 4px; font-size: 0.66rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
@@ -121,3 +121,9 @@
 .ir-detail h4 { margin: 0 0 var(--s2); font-size: var(--fs-sm); }
 .ir-detail .kv dd { white-space: nowrap; }
 .notes-diff td .cell-sub { white-space: normal; }
+
+/* Trade semelhante em aberto (boleta) */
+.ticket-similar { display: grid; gap: 6px; padding: var(--s3) var(--s5) 0; }
+.ticket-similar .note { font-size: var(--fs-xs); }
+.ticket-similar a { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.ticket-similar .link-btn { font-weight: 600; }

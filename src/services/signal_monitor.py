@@ -21,7 +21,7 @@ from src.core import db
 from src.core.config import get_prefs, monitor_poll_seconds, now_iso, now_utc
 from src.core.market_hours import business_days_between, market_status, now_brt, to_brt
 from src.integrations.tradingfloors import TFError, TradingFloorsAPI, get_client, merge_rows
-from src.services import alerts, auto_link, journal, performance, portfolio
+from src.services import alerts, auto_link, journal, performance, portfolio, similar
 from src.services.legacy_import import import_legacy_cache
 from src.services.signals import hydrate, is_followed, mark_closed, upsert_signals
 
@@ -257,6 +257,9 @@ class SignalMonitor:
                 body += f" · agora {_fmt_price(sig['preco_atual'])}"
             if link and link["orders"]:
                 body += " · sua ordem aberta neste ativo foi vinculada"
+            sim = similar.describe(similar.find(sig, list(held.values())))
+            if sim:
+                body += f" · {sim}"
             alerts.create_alert(c, "new_signal", f"Novo sinal: {sig['trader']} {verb} {sig['ticker']}", body,
                                 signal_id=sid, ticker=sig["ticker"], severity="action", dedup_key=f"new:{sid}")
 

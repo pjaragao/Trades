@@ -78,6 +78,10 @@ Se você já executou e registrou a ordem, o Copiloto vincula a execução ao si
 - **nota de corretagem:** execuções criadas pela nota também dão baixa nos sinais do mesmo pregão;
 - a cada ciclo o monitor revisa execuções das últimas 72 h que ficaram sem sinal.
 
+**Trade semelhante em aberto:** um sinal no mesmo ativo-objeto de uma posição sua (ex.: ROXOK135 da Sanita com ROXOJ12
+do Ferri em carteira) continua aparecendo, com um aviso mostrando a posição parecida — mesma direção (aumenta a exposição),
+direção contrária ou o mesmo ativo (com o atalho "É este trade — vincular").
+
 Só entram execuções que abrem/aumentam posição no sentido do sinal. A janela é ajustável em Configurações › Quem seguir
 (0 desliga).
 

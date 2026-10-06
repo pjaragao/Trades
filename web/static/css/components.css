@@ -260,5 +260,5 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .flash-down { animation: flash-down 1.2s ease-out; }
 @keyframes flash-up { from { background: var(--accent-soft); } to { background: transparent; } }
 @keyframes flash-down { from { background: var(--danger-soft); } to { background: transparent; } }
-.ticket-quote { margin-top: calc(var(--s2) * -1); }
+.ticket-quote { padding: 6px var(--s5) 0; }
 @media (prefers-reduced-motion: reduce) { .flash-up, .flash-down, .qdot.live { animation: none; } }

@@ -133,6 +133,23 @@ def link_execution(c, exec_id: int, prefs: Optional[Dict[str, Any]] = None, unti
             "execution_id": exec_id}
 
 
+def link_cycle(c, signal_id: str, cycle_id: str) -> int:
+    """Vincula as execuções (sem sinal, mesmo lado) de uma posição minha a um sinal e marca como executado."""
+    sig = c.execute("SELECT * FROM signals WHERE id = ?", (signal_id,)).fetchone()
+    if not sig:
+        raise KeyError(signal_id)
+    led = journal.ledger(c, "real")
+    cycle = next((cy for cy in led["cycles"] if cy["id"] == cycle_id), None)
+    if not cycle or not cycle["execution_ids"]:
+        return 0
+    ids = cycle["execution_ids"]
+    n = c.execute(f"UPDATE executions SET signal_id = ? WHERE signal_id IS NULL AND side = ? AND id IN ({','.join('?' * len(ids))})",
+                  [signal_id, sig["lado"], *ids]).rowcount
+    if n:
+        _mark_executed(c, signal_id, "Vinculado à posição que eu já tinha")
+    return n
+
+
 def sweep(c, prefs: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """A cada ciclo do monitor: execuções recentes (até fresh_hours) ainda sem sinal que casam com um sinal aberto."""
     prefs = prefs or get_prefs(c)
@@ -149,4 +166,4 @@ def sweep(c, prefs: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     return out
 
 
-__all__ = ["link_new_signal", "link_execution", "sweep", "signal_anchor", "match_minutes"]
+__all__ = ["link_new_signal", "link_execution", "link_cycle", "sweep", "signal_anchor", "match_minutes"]

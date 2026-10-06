@@ -40,6 +40,28 @@ function driftTone(ticket) {
   return 'muted';
 }
 
+const SIMILAR_HEAD = {
+  same_ticker: 'Você já tem este ativo em aberto', same_direction: 'Trade semelhante em aberto', opposite: 'Posição contrária em aberto',
+};
+
+// Posição parecida (mesmo ativo-objeto): o sinal aparece, mas com o aviso de qual trade já está aberto
+export function similarHtml(sig) {
+  const list = sig.similar || [];
+  if (!list.length) return '';
+  return `<div class="ticket-similar">${list.slice(0, 3).map((x) => {
+    const what = [x.kind ? `${x.kind} de ${x.underlying}` : x.underlying, x.expiration ? `vence ${f.date(x.expiration + 'T12:00:00-03:00')}` : '']
+      .filter(Boolean).join(' · ');
+    const who = x.trader ? `sinal de ${esc(x.trader)}${x.signal_guessed ? ' (auto)' : ''}` : 'manual';
+    const pnl = x.unrealized_pct !== null && x.unrealized_pct !== undefined ? ` · <span class="${f.tone(x.unrealized_pct)}">${f.pct(x.unrealized_pct)}</span>` : '';
+    const tail = x.relation === 'same_direction' ? ` Mesmo ativo-objeto e mesma direção: entrar aumenta sua exposição a ${esc(x.underlying || '')}.`
+      : x.relation === 'opposite' ? ' Este sinal vai na direção oposta à sua posição.' : '';
+    return `<div class="note ${x.relation === 'opposite' ? 'info' : 'warning'}">${icon(x.relation === 'opposite' ? 'info' : 'alert')}<span>
+      <strong>${SIMILAR_HEAD[x.relation]}:</strong> <a href="#/carteira">${esc(x.ticker)}</a>${what ? ` (${esc(what)})` : ''}, ${who} —
+      ${f.qty(x.quantity)} un · médio ${f.brl(x.avg_price)}${pnl}.${tail}
+      ${x.relation === 'same_ticker' ? ` <button class="link-btn" data-action="link-position" data-position="${esc(x.cycle_id)}">É este trade — vincular</button>` : ''}</span></div>`;
+  }).join('')}</div>`;
+}
+
 function totalsHtml(t) {
   return `
     <div><div class="t-lbl">Total ≈</div><div class="t-val">${f.brl(t.total)}</div></div>
@@ -76,6 +98,7 @@ export function ticketCard(sig, { kind = 'new', isNew = false, compact = false }
       ${sig.status === 'CLOSED' ? '<span class="badge badge-warn">Encerrado pelo analista</span>' : ''}
     </div>
     <div class="ticket-desc">${esc(optionDesc(sig))}</div>
+    ${similarHtml(sig)}
     <div class="ticket-prices">
       <div class="price-stat"><div class="lbl">Entrada analista</div><div class="val">${f.brl(t.entry_price, { dec: 2 })}</div><div class="sub muted">${esc(f.dateTime(sig.timestamp_entrada))}</div></div>
       <div class="price-stat"><div class="lbl" title="Com MT5 ao vivo: melhor oferta de ${sig.lado === 'SELL' ? 'compra (o que você receberia)' : 'venda (o que você pagaria)'}">Agora</div><div class="val" data-lp="${esc(sig.ticker)}" data-basis="${basis}">${t.current_price === null ? '—' : f.brl(t.current_price)}</div><div class="sub ${driftTone(t)}" data-ldrift="${esc(sig.ticker)}" data-entry="${t.entry_price || ''}" data-side="${esc(sig.lado)}" data-basis="${basis}" title="Diferença em relação à entrada do analista">${t.drift_pct === null ? 'sem cotação' : f.pct(t.drift_pct)}</div></div>
@@ -229,6 +252,14 @@ export function bindTickets(root, { getPositions = () => [] } = {}) {
       if (!entry) return;
       const { sig } = entry;
       if (action === 'copy') return copyText(entry.ticket.copy_text, 'Boleta copiada — cole no Home Broker');
+      if (action === 'link-position') {
+        try {
+          await post(`/api/signals/${encodeURIComponent(sig.id)}/link-position`, { cycle_id: btn.dataset.position });
+          toast(`Sinal de ${sig.trader} vinculado à sua posição em ${sig.ticker} e marcado como executado.`, 'success');
+          emit('data-changed');
+        } catch (err) { toastError(err); }
+        return;
+      }
       if (action === 'send') {
         const t = entry.ticket;
         return openOrderModal({

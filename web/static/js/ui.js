@@ -177,9 +177,26 @@ export function showMenu(anchor, html) {
   const m = document.createElement('div');
   m.className = 'menu';
   m.innerHTML = html;
-  anchor.parentElement.appendChild(m);
+  // fora do cartão: os cards têm overflow:hidden e backdrop-filter (que prenderia até um position:fixed)
+  (anchor.closest('.modal-backdrop') || document.body).appendChild(m);
+  placeMenu(m, anchor);
   return m;
 }
+
+// Posição fixa calculada pelo botão: sempre dentro da tela, acima do botão (ou abaixo, se não couber)
+function placeMenu(m, anchor) {
+  const r = anchor.getBoundingClientRect();
+  const gap = 6;
+  const margin = 8;
+  const w = m.offsetWidth;
+  const h = m.offsetHeight;
+  const left = Math.max(margin, Math.min(r.right - w, window.innerWidth - w - margin));
+  let top = r.top - h - gap;
+  if (top < margin) top = Math.min(r.bottom + gap, window.innerHeight - h - margin);
+  Object.assign(m.style, { position: 'fixed', left: `${left}px`, top: `${Math.max(margin, top)}px`, right: 'auto', bottom: 'auto' });
+}
+window.addEventListener('resize', () => closeMenus());
+window.addEventListener('scroll', (e) => { if (!(e.target instanceof Element && e.target.closest('.menu'))) closeMenus(); }, true);
 
 export function loading(text = 'Carregando…') {
   return `<div class="loading-block"><span class="spinner"></span>${esc(text)}</div>`;
