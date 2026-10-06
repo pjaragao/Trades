@@ -12,7 +12,7 @@ import requests
 from src.core import db
 from src.core.config import get_prefs, now_iso, telegram_credentials
 
-NOTIFY_KINDS = {"new_signal", "exit_pending", "stop_hit", "target_hit", "reminder",
+NOTIFY_KINDS = {"new_signal", "signal_executed", "exit_pending", "stop_hit", "target_hit", "reminder",
                 "order_filled", "order_rejected", "order_problem", "auto_order"}
 
 

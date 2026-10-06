@@ -73,6 +73,8 @@ def evaluate_entry(sig: Dict[str, Any], prefs: Dict[str, Any], account: str, ope
         return {"ok": False, "reason": "Já existe posição ou ordem aberta nesse ativo."}
     if sig.get("decision") and sig["decision"]["status"] == "ignored":
         return {"ok": False, "reason": "Você marcou o sinal como ignorado."}
+    if account == "real" and sig.get("decision") and sig["decision"]["status"] == "executed":
+        return {"ok": False, "reason": "Você já executou este sinal."}
 
     exposure = portfolio.exposure(account=account)
     ticket = build_ticket(sig, prefs, exposure=exposure, trader_profile=profile)

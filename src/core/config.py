@@ -45,6 +45,8 @@ DEFAULT_PREFS: Dict[str, Any] = {
         "asset_classes": ["OPCAO", "ACAO"],
         # Sinais com entrada mais antiga que isso vão para a caixa de Sinais, não para "Hoje"
         "fresh_hours": 72,
+        # Execução registrada até X min antes da entrada do analista dá baixa automática no sinal quando ele chega
+        "match_minutes": 30,
     },
     "costs": {
         "brokerage_per_order": 0.0,
@@ -272,6 +274,7 @@ def _validate_prefs(p: Dict[str, Any]) -> Dict[str, Any]:
     f["traders"] = [str(t).strip() for t in (f.get("traders") or []) if str(t).strip()]
     f["asset_classes"] = [a for a in (f.get("asset_classes") or []) if a in ASSET_CLASSES]
     f["fresh_hours"] = int(_num(f.get("fresh_hours"), 72, 1, 24 * 30))
+    f["match_minutes"] = int(_num(f.get("match_minutes"), 30, 0, 240))
 
     c = out["costs"]
     c["brokerage_per_order"] = _num(c.get("brokerage_per_order"), 0.0, 0)

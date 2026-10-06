@@ -66,6 +66,21 @@ Copie `config/.env.example` para `config/.env`, preencha `TF_EMAIL`/`TF_PASSWORD
 | IRPF mês a mês (fechado com notas x estimado), DARF, IR se encerrar tudo agora, resumo anual | **Notas e IR** |
 | Quem vale a pena seguir? Backtest de cópia, screeners, IA, base de conhecimento | **Laboratório** |
 
+## Baixa automática de sinais já executados
+
+O aviso do analista costuma chegar antes no WhatsApp do que na API do TradingFloors (ex.: entrada 12:19, API 12:20:33).
+Se você já executou e registrou a ordem, o Copiloto vincula a execução ao sinal e marca como **executado**:
+
+- **sinal chega depois:** execuções do mesmo ativo e lado, sem sinal, feitas desde 30 min antes da entrada do analista
+  (ou registradas nos últimos 30 min) — o alerta vira "Já executado" em vez de "Novo sinal"; ordens abertas no MT5 também
+  são vinculadas;
+- **você registra depois:** "Registrar operação" sem escolher sinal vincula ao sinal aberto do mesmo ativo e lado;
+- **nota de corretagem:** execuções criadas pela nota também dão baixa nos sinais do mesmo pregão;
+- a cada ciclo o monitor revisa execuções das últimas 72 h que ficaram sem sinal.
+
+Só entram execuções que abrem/aumentam posição no sentido do sinal. A janela é ajustável em Configurações › Quem seguir
+(0 desliga).
+
 ## Cotações
 
 | Fonte | O quê | Atraso | Quando |

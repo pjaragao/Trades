@@ -177,6 +177,9 @@ export default {
             <div class="field"><label for="fresh">Sinal conta como "novo" por até (horas)</label>
               <input id="fresh" class="input num" data-k="follow.fresh_hours" value="${p.follow.fresh_hours}" style="max-width:140px">
               <span class="hint">Depois disso, sem decisão, ele vai para a caixa de Sinais em vez da tela Hoje.</span></div>
+            <div class="field"><label for="match">Baixa automática: execuções registradas até (minutos) antes do sinal</label>
+              <input id="match" class="input num" data-k="follow.match_minutes" value="${p.follow.match_minutes ?? 30}" style="max-width:140px">
+              <span class="hint">O aviso do WhatsApp chega antes do sinal aqui. Se você já executou e registrou a ordem nesse intervalo, o sinal é vinculado e marcado como executado sozinho (0 desliga).</span></div>
           </div>
         </section>
 

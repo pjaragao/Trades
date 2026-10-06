@@ -42,7 +42,15 @@ def add_execution():
     if not data.get("executed_at"):
         data["executed_at"] = now_brt().isoformat(timespec="seconds")
     row = journal.add_execution(data, allow_short=bool(data.get("allow_short")))
-    return jsonify(row), 201
+    linked = None
+    if not row.get("signal_id"):
+        from src.core import db
+        from src.services import auto_link
+
+        with db.transaction() as c:
+            linked = auto_link.link_execution(c, row["id"])
+            row = dict(c.execute("SELECT * FROM executions WHERE id = ?", (row["id"],)).fetchone())
+    return jsonify({**row, "linked_signal": linked}), 201
 
 
 @bp.put("/executions/<int:exec_id>")

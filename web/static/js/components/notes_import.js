@@ -140,7 +140,8 @@ export async function openNotesImport() {
     try {
       const r = await post('/api/notes/apply', { preview, update_estimates: el('#ncal').checked });
       m.close();
-      const parts = [`${r.updated} atualizada(s)`, r.replaced ? `${r.replaced} substituída(s)` : '', `${r.created} criada(s)`, r.deleted ? `${r.deleted} excluída(s)` : ''].filter(Boolean);
+      const parts = [`${r.updated} atualizada(s)`, r.replaced ? `${r.replaced} substituída(s)` : '', `${r.created} criada(s)`, r.deleted ? `${r.deleted} excluída(s)` : '',
+        r.linked ? `${r.linked} vinculada(s) a sinais` : ''].filter(Boolean);
       toast(`${r.notes} nota(s) importada(s): ${parts.join(', ')}${r.errors.length ? ` · ${r.errors.length} com erro` : ''}.`, r.errors.length ? 'warning' : 'success', 8000);
       if (r.errors.length) r.errors.forEach((e) => toast(e, 'error', 10000));
       if (r.calibration && r.calibration.applied) {

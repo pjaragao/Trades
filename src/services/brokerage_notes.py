@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.core import b3_tickers, db
 from src.core.config import get_prefs, now_iso, update_prefs
 from src.core.market_hours import BRT, to_brt
-from src.services import journal
+from src.services import auto_link, journal
 
 MONEY = r"-?\d{1,3}(?:\.\d{3})*,\d{2,}"
 _MONEY_RE = re.compile(MONEY)
@@ -546,7 +546,7 @@ def _delete_extra(c, exec_id: int, undo: Dict[str, Any]) -> bool:
 
 
 def apply_preview(payload: Dict[str, Any], update_estimates: bool = True) -> Dict[str, Any]:
-    stats = {"notes": 0, "updated": 0, "replaced": 0, "created": 0, "deleted": 0, "skipped": 0, "errors": []}
+    stats = {"notes": 0, "updated": 0, "replaced": 0, "created": 0, "deleted": 0, "skipped": 0, "linked": 0, "errors": []}
     for n in sorted(payload.get("notes", []), key=lambda n: (n.get("trade_date") or "", n.get("number") or "")):
         if n.get("already_imported") or not n.get("trade_date"):
             stats["skipped"] += len(n.get("groups", []))
@@ -567,7 +567,7 @@ def apply_preview(payload: Dict[str, Any], update_estimates: bool = True) -> Dic
                 )
                 note_id = cur.lastrowid
                 undo: Dict[str, Any] = {"updated": [], "deleted": [], "fills": []}
-                counts = {"updated": 0, "replaced": 0, "created": 0, "deleted": 0, "skipped": 0}
+                counts = {"updated": 0, "replaced": 0, "created": 0, "deleted": 0, "skipped": 0, "linked": 0}
                 # compras antes das vendas (day trade na mesma nota)
                 for g in sorted(n.get("groups", []), key=lambda g: 0 if g.get("side") == "BUY" else 1):
                     action = g.get("action")
@@ -575,12 +575,14 @@ def apply_preview(payload: Dict[str, Any], update_estimates: bool = True) -> Dic
                     if action in ("update", "replace") and g.get("matches"):
                         counts[_apply_group(c, note_id, day, g, undo)] += 1
                     elif action in ("create", "update", "replace") and ticker:
-                        journal.add_execution(
+                        created = journal.add_execution(
                             {"ticker": ticker, "side": g["side"], "quantity": g["quantity"], "price": g["price"], "fees": g["fees"],
                              "executed_at": f"{day}T10:00:00-03:00", "asset_class": b3_tickers.asset_class(None, ticker),
                              "note": f"Importado da nota {n['broker']} nº {n['number']}"},
                             allow_short=True, account="real", source="note", note_id=note_id, fees_source="note", conn=c,
                         )
+                        if auto_link.link_execution(c, created["id"], until_end_of_day=True):
+                            counts["linked"] += 1
                         counts["created"] += 1
                     else:
                         counts["skipped"] += 1

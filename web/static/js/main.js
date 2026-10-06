@@ -124,6 +124,7 @@ function setBadge(path, n, warn = false) {
 const KIND_ICON = {
   new_signal: ['zap', 'action'], exit_pending: ['exit', 'warn'], reminder: ['snooze', 'action'], stop_hit: ['alert', 'danger'],
   target_hit: ['check', 'action'], expiry: ['clock', 'danger'], signal_closed: ['info', ''], order_filled: ['check', 'action'],
+  signal_executed: ['check', 'action'],
   order_rejected: ['alert', 'danger'], order_problem: ['alert', 'danger'], auto_order: ['zap', 'warn'], auto_blocked: ['shield', ''],
 };
 

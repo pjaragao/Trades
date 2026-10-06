@@ -162,10 +162,11 @@ export function openExecutionForm(opts) {
     }
     btn.disabled = true;
     try {
-      if (mode === 'edit') await put(`/api/executions/${opts.execution.id}`, payload);
-      else await post('/api/executions', payload);
+      const saved = mode === 'edit' ? await put(`/api/executions/${opts.execution.id}`, payload) : await post('/api/executions', payload);
       m.close();
-      toast(mode === 'exit' ? 'Saída registrada. Resultado lançado em Resultados.' : mode === 'entry' ? 'Entrada registrada. Acompanhe na Carteira.' : 'Execução salva.', 'success');
+      const ls = saved && saved.linked_signal;
+      toast(ls ? `Execução salva e vinculada ao sinal de ${ls.trader} em ${ls.ticker} — sinal marcado como executado.`
+        : mode === 'exit' ? 'Saída registrada. Resultado lançado em Resultados.' : mode === 'entry' ? 'Entrada registrada. Acompanhe na Carteira.' : 'Execução salva.', 'success', ls ? 7000 : undefined);
       onSaved && onSaved();
     } catch (e) {
       err.textContent = e.message;

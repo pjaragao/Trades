@@ -21,7 +21,7 @@ from src.core import db
 from src.core.config import get_prefs, monitor_poll_seconds, now_iso, now_utc
 from src.core.market_hours import business_days_between, market_status, now_brt, to_brt
 from src.integrations.tradingfloors import TFError, TradingFloorsAPI, get_client, merge_rows
-from src.services import alerts, journal, performance, portfolio
+from src.services import alerts, auto_link, journal, performance, portfolio
 from src.services.legacy_import import import_legacy_cache
 from src.services.signals import hydrate, is_followed, mark_closed, upsert_signals
 
@@ -240,15 +240,31 @@ class SignalMonitor:
             row = c.execute("SELECT * FROM signals WHERE id = ?", (sid,)).fetchone()
             if not row:
                 continue
+            # o aviso do WhatsApp chega antes: se eu já executei, o sinal recebe baixa automática
+            link = auto_link.link_new_signal(c, dict(row), prefs)
             sig = hydrate(dict(row), prefs)
+            verb = "comprou" if sig["lado"] == "BUY" else "vendeu"
+            if link and link["executions"]:
+                body = (f"Sua execução ({link['quantity']:,.0f} a {_fmt_price(link['avg_price'])}) foi vinculada ao sinal "
+                        f"(entrada do analista {_fmt_price(sig['preco_entrada'])}).").replace(",", ".", 1)
+                alerts.create_alert(c, "signal_executed", f"Já executado: {sig['trader']} {verb} {sig['ticker']}", body,
+                                    signal_id=sid, ticker=sig["ticker"], severity="info", dedup_key=f"new:{sid}")
+                continue
             if not is_followed(sig, prefs):
                 continue
-            verb = "comprou" if sig["lado"] == "BUY" else "vendeu"
             body = f"Entrada {_fmt_price(sig['preco_entrada'])}"
             if sig.get("preco_atual") is not None:
                 body += f" · agora {_fmt_price(sig['preco_atual'])}"
+            if link and link["orders"]:
+                body += " · sua ordem aberta neste ativo foi vinculada"
             alerts.create_alert(c, "new_signal", f"Novo sinal: {sig['trader']} {verb} {sig['ticker']}", body,
                                 signal_id=sid, ticker=sig["ticker"], severity="action", dedup_key=f"new:{sid}")
+
+        # execuções recentes que ficaram sem sinal (registradas depois, ou antes desta versão) e casam com um sinal aberto
+        for link in auto_link.sweep(c, prefs):
+            alerts.create_alert(c, "signal_executed", f"Já executado: {link['trader']} {link['ticker']}",
+                                "Sua execução registrada foi vinculada ao sinal, que ficou marcado como executado.",
+                                signal_id=link["signal_id"], ticker=link["ticker"], severity="info", dedup_key=f"link:{link['execution_id']}")
 
         for sid in res.get("closed", []):
             row = c.execute("SELECT * FROM signals WHERE id = ?", (sid,)).fetchone()
