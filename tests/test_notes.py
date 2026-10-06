@@ -209,3 +209,50 @@ def test_api_endpoints(tmp_db):
     # a nota é a verdade: as duas linhas viram execuções (a venda de PETR4 abre posição vendida)
     assert r.status_code == 200 and body["created"] == 2 and not body["errors"]
     assert len(client.get("/api/notes").get_json()["notes"]) == 1
+
+
+# Layout real da Genial (dados fictícios): C/V colado em "B3 RV LISTADOC", obs "#", "/EJ" na especificação,
+# código de opção com 1 e 2 dígitos e a data de liquidação com o espaço deslocado ("para0 6/10/2026").
+GENIAL_REAL = """NOTA DE CORRETAGEM
+Nr.Nota Folha Data pregão
+12345 1 05/10/2026
+GENIAL CCTVM S/A
+Cliente C.P.F./C.N.P.J./C.V.M./C.O.B.
+1234567-1 CLIENTE FICTICIO 000.000.000-00
+Negócios realizados
+Q Negociação C/V Tipo mercado Prazo Especificação do título Obs. (*) Quantidade Preço / Ajuste Valor Operação / Ajuste D/C
+B3 RV LISTADOC OPCAO DE COMPRA 11/26 PETRK420 PN 42,00 PETR # 1.000 0,50 500,00 D
+B3 RV LISTADOC OPCAO DE COMPRA 10/26 ROXOJ15 DRN 15,00 ROXO 1.000 0,40 400,00 D
+B3 RV LISTADOC OPCAO DE COMPRA 11/26 VALEK600 ON 60,00 VALE /EJ 200 1,00 200,00 D
+B3 RV LISTADOC OPCAO DE COMPRA 11/26 BBASK3 ON 21,00 BBAS 1.000 0,30 300,00 D
+Resumo dos Negócios Resumo Financeiro D/C
+Vendas à vista 0,00 Clearing
+Opções - Compras 1.400,00 Valor líquido das operações 1.400,00 D
+Opções - Vendas 0,00 Taxa de liquidação/CCP 0,39 D
+Compras à Futuro 0,00 Taxa de Registro 0,98 D
+Vendas à Futuro 0,00 Total CBLC 1.401,37 D
+Ajuste do Dia 0,00 Bolsa
+Ajuste da Posição 0,00 Taxa de termo/opções 0,00 D
+Ajuste de Day-Trade 0,00 Emolumentos 0,52 D
+Valor das operações 1.400,00 Total Bovespa / Soma 0,52 D
+Corretagem / Despesas
+Clearing 4,95 D
+Execução 0,00 D
+Execução casa 0,00 D
+ISS ( SÃO PAULO ) 0,24
+ISS/PIS/COFINS 0,47 D
+Total corretagem / Despesas 5,42
+(*) - Observações: A - Posição Futuro T - Liquidação pelo Bruto Líquido para0 6/10/2026 1.407,31 D"""
+
+
+def test_parse_genial_real_layout():
+    notes = bn.parse_pages([GENIAL_REAL])
+    assert len(notes) == 1
+    n = notes[0]
+    assert n["broker"] == "Genial" and n["number"] == "12345" and n["trade_date"] == "2026-10-05" and n["warnings"] == []
+    assert [t["quantity"] for t in n["trades"]] == [1000, 1000, 200, 1000]
+    groups = {g["ticker"]: g for g in bn._group_trades(n)}
+    assert set(groups) == {"PETRK420", "ROXOJ15", "VALEK600", "BBASK3"}
+    assert n["b3_fees"] == pytest.approx(0.39 + 0.98 + 0.52) and n["broker_fees"] == pytest.approx(5.42)
+    assert n["total_costs"] == pytest.approx(7.31) and sum(g["fees"] for g in groups.values()) == pytest.approx(7.31)
+    assert n["fees"]["settlement_date"] == "06/10/2026" and n["fees"]["net_value"] == pytest.approx(-1407.31)

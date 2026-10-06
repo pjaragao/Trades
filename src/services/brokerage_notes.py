@@ -34,7 +34,8 @@ MARKET_TYPES = [
     "OPCAO DE COMPRA", "OPCAO DE VENDA", "EXERC OPC COMPRA", "EXERC OPC VENDA", "EXERCICIO OPC COMPRA",
     "EXERCICIO OPC VENDA", "VISTA", "FRACIONARIO", "TERMO", "LEILAO", "OPCOES",
 ]
-LINE_RE = re.compile(r"^(?:\S{1,3}\s+)?(1-BOVESPA|B3\s+RV\s+LISTADO|BOVESPA|B3\s+RV)\s+(C|V)\s+(.+)$")
+# C/V pode vir colado ao mercado na extração do PDF (Genial: "B3 RV LISTADOC OPCAO DE COMPRA ...")
+LINE_RE = re.compile(r"^(?:\S{1,3}\s+)?(1-BOVESPA|B3\s+RV\s+LISTADO|BOVESPA|B3\s+RV)\s*(C|V)\s+(.+)$")
 OBS_RE = re.compile(r"^(?:[#DFBACHXYLPIT]|D#|#D|D8|8)$")
 
 FEE_LABELS = {
@@ -106,7 +107,11 @@ class NotePasswordError(ValueError):
 
 
 def read_pdf(data: bytes, password: Optional[str] = None) -> List[str]:
+    import logging
+
     import pdfplumber
+
+    logging.getLogger("pdfminer").setLevel(logging.ERROR)  # avisos de fonte das notas (FontBBox) são inofensivos
 
     try:
         with pdfplumber.open(io.BytesIO(data), password=password or "") as pdf:
@@ -244,10 +249,11 @@ def _fees(text: str) -> Dict[str, Any]:
     if m:
         v = _money(m.group(1))
         out["net_ops"] = -v if (m.group(2) == "d") else v
-    m = re.search(r"liquido para\s*(\d{2}/\d{2}/\d{4})\s*(" + MONEY + r")\s*([dc])?", scope)
+    # a extração às vezes desloca o espaço da data ("liquido para0 6/10/2026")
+    m = re.search(r"liquido para\s*(\d\s?\d/\d{2}/\d{4})\s*(" + MONEY + r")\s*([dc])?", scope)
     if m:
         v = _money(m.group(2))
-        out["settlement_date"] = m.group(1)
+        out["settlement_date"] = m.group(1).replace(" ", "")
         out["net_value"] = -v if m.group(3) == "d" else v
     m = re.search(r"valor das operacoes\s*(" + MONEY + r")", scope)
     if m:
