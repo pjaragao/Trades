@@ -36,7 +36,7 @@ MARKET_TYPES = [
 ]
 # C/V pode vir colado ao mercado na extração do PDF (Genial: "B3 RV LISTADOC OPCAO DE COMPRA ...")
 LINE_RE = re.compile(r"^(?:\S{1,3}\s+)?(1-BOVESPA|B3\s+RV\s+LISTADO|BOVESPA|B3\s+RV)\s*(C|V)\s+(.+)$")
-OBS_RE = re.compile(r"^(?:[#DFBACHXYLPIT]|D#|#D|D8|8)$")
+OBS_RE = re.compile(r"^(?:[#DFBACHXYLPIT2S@*]|D#|#D|D8|8|FM|D2|2D|D@|@D)$", re.I)
 
 FEE_LABELS = {
     "liquidacao": r"taxa de liquidacao",
@@ -73,6 +73,7 @@ NAME_TO_PREFIX = {
     "LWSA": "LWSA", "NEOENERGIA": "NEOE", "TUPY": "TUPY", "BRAVA": "BRAV", "GPA": "PCAR", "CVC BRASIL": "CVCB",
     "AUREN": "AURE", "SAO MARTINHO": "SMTO", "3TENTOS": "TTEN", "SMARTFIT": "SMFT", "GRUPO MATEUS": "GMAT",
     "ISHARE BOVA": "BOVA", "ISHARES BOVA": "BOVA", "ISHARE SMAL": "SMAL", "ISHARES SMAL": "SMAL",
+    "CASAS BAHIA": "BHIA", "CASAS BAHIA S/A": "BHIA", "CASAS BAHIA S.A.": "BHIA", "VIA VAREJO": "BHIA", "VIA VAREJO S/A": "BHIA", "VIA": "BHIA",
 }
 CLASS_SUFFIX = {"ON": "3", "PN": "4", "PNA": "5", "PNB": "6", "PNC": "7", "PND": "8", "UNT": "11", "CI": "11"}
 
@@ -158,14 +159,26 @@ def detect_broker(text: str) -> str:
 def _header(text: str) -> Tuple[Optional[str], Optional[str], Optional[int]]:
     """(número da nota, data do pregão dd/mm/aaaa, folha)"""
     t = _norm(text)
-    m = re.search(r"Nr\.?\s*nota\s+Folha\s+Data\s+preg\w*\s*\n\s*(\d[\d.]*)\s+(\d+)\s+(\d{2}/\d{2}/\d{4})", t, re.I)
+    # 1. Padrão SINACOR clássico: "Nr.Nota Folha Data pregão" seguido dos valores (aceita \n ou múltiplos espaços)
+    m = re.search(r"Nr\.?\s*nota\s+Folha\s+Data\s+preg\w*[\s\n]+(\d[\d.]*)\s+(\d+)\s+(\d{2}/\d{2}/\d{4})", t, re.I)
     if m:
         return m.group(1).replace(".", ""), m.group(3), int(m.group(2))
-    m = re.search(r"(\d{4,12})\s+(\d{1,3})\s+(\d{2}/\d{2}/\d{4})", t)
+    # 2. Quando há pontuação, colunas ou texto entre os rótulos e os valores
+    m = re.search(r"Nr\.?\s*nota[^\d\n]{0,30}(\d[\d.]*)[^\d\n]{1,30}(\d+)[^\d\n]{1,30}(\d{2}/\d{2}/\d{4})", t, re.I)
     if m:
-        return m.group(1), m.group(3), int(m.group(2))
-    m = re.search(r"Data\s+preg\w*\D{0,40}(\d{2}/\d{2}/\d{4})", t, re.I)
-    return None, (m.group(1) if m else None), None
+        return m.group(1).replace(".", ""), m.group(3), int(m.group(2))
+    # 3. Padrão numérico "NUMERO FOLHA DATA" no texto (aceita notas a partir de 1 dígito, como 535)
+    m = re.search(r"(?:^|[^\d])(\d{1,12})\s+(\d{1,3})\s+(\d{2}/\d{2}/\d{4})\b", t)
+    if m:
+        return m.group(1).replace(".", ""), m.group(3), int(m.group(2))
+    # 4. Fallback individual para data, número e folha
+    m_date = re.search(r"Data\s+preg\w*\D{0,40}(\d{2}/\d{2}/\d{4})", t, re.I)
+    m_num = re.search(r"Nr\.?\s*nota[^\d\n]{0,30}(\d[\d.]*)", t, re.I)
+    m_folha = re.search(r"Folha[^\d\n]{0,20}(\d+)", t, re.I)
+    num = m_num.group(1).replace(".", "") if m_num else None
+    day = m_date.group(1) if m_date else None
+    folha = int(m_folha.group(1)) if m_folha else None
+    return num, day, folha
 
 
 def parse_trade_line(line: str) -> Optional[Dict[str, Any]]:
@@ -692,13 +705,41 @@ def coverage(conn=None) -> Dict[str, Any]:
     """
     days: Dict[str, Dict[str, Any]] = {}
     with db.connection(conn) as c:
-        for r in c.execute("SELECT ticker, executed_at, note_id FROM executions WHERE account = 'real'"):
-            d = days.setdefault(_day(dict(r)), {"executions": 0, "with_note": 0, "tickers": set()})
+        for r in c.execute("""
+            SELECT id, ticker, side, quantity, price, fees, fees_source, asset_class, executed_at, note_id
+            FROM executions WHERE account = 'real' ORDER BY executed_at, id
+        """):
+            r = dict(r)
+            d = days.setdefault(_day(r), {"executions": 0, "with_note": 0, "tickers": set(), "missing_ops": []})
             d["executions"] += 1
             if r["note_id"]:
                 d["with_note"] += 1
             else:
                 d["tickers"].add(r["ticker"])
+                d["missing_ops"].append({
+                    "id": r["id"],
+                    "ticker": r["ticker"],
+                    "side": r["side"],
+                    "quantity": r["quantity"],
+                    "price": r["price"],
+                    "value": round(float(r["quantity"] or 0) * float(r["price"] or 0), 2),
+                    "fees": r["fees"],
+                    "fees_source": r["fees_source"],
+                    "asset_class": r["asset_class"],
+                    "executed_at": r["executed_at"],
+                })
+
+        notes_by_day: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for nr in c.execute("SELECT id, broker, number, trade_date, gross_value, net_value, total_costs FROM notes ORDER BY id"):
+            notes_by_day[nr["trade_date"]].append({
+                "id": nr["id"],
+                "broker": nr["broker"],
+                "number": nr["number"],
+                "gross_value": nr["gross_value"],
+                "net_value": nr["net_value"],
+                "total_costs": nr["total_costs"],
+            })
+
     months: Dict[str, Dict[str, Any]] = {}
     for day in sorted(days):
         d = days[day]
@@ -707,7 +748,13 @@ def coverage(conn=None) -> Dict[str, Any]:
         if d["with_note"] == d["executions"]:
             m["covered"] += 1
         else:
-            m["missing"].append({"date": day, "executions": d["executions"] - d["with_note"], "tickers": sorted(d["tickers"])})
+            m["missing"].append({
+                "date": day,
+                "executions": d["executions"] - d["with_note"],
+                "tickers": sorted(d["tickers"]),
+                "operations": d["missing_ops"],
+                "imported_notes": notes_by_day.get(day, []),
+            })
     for m in months.values():
         m["complete"] = m["days"] > 0 and m["covered"] == m["days"]
     return {"months": months, "days_total": len(days), "days_covered": sum(m["covered"] for m in months.values())}

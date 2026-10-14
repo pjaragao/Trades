@@ -114,6 +114,7 @@ export default {
       const s = data.summary;
       const mv = data.positions.reduce((acc, p) => acc + (p.market_value || 0), 0);
       const showToggle = data.has_paper || state.status?.execution?.mode === 'paper' || account === 'paper';
+      const unnoted = account === 'real' ? execs.filter((e) => e.fees_source !== 'note' && !e.note_id).length : 0;
       root.innerHTML = `
         <div class="page-head"><div><h1>Carteira</h1><p class="sub">${account === 'paper' ? 'Conta <strong>simulada</strong>: ordens enviadas no modo simulação. Não afeta seus resultados reais.' : 'Suas posições reais (do que você registrou ou o MT5 executou), marcadas a mercado e comparadas ao sinal.'}</p></div>
           <div class="row wrap">
@@ -133,7 +134,7 @@ export default {
         ${ordersSection(ex)}
         <section class="section">
           <div class="section-title"><h2>${icon('clock')} Execuções registradas <span class="count">${execs.length}</span></h2>
-            <div class="row">${account === 'real' ? `<button class="btn btn-sm" data-act="notes">${icon('download')} Importar nota de corretagem</button>` : ''}
+            <div class="row">${account === 'real' ? `<button class="btn btn-sm" data-act="notes">${icon('download')} Importar nota de corretagem${unnoted ? ` <span class="badge badge-warn badge-plain" style="height:18px;padding:0 5px">${unnoted} sem nota</span>` : ''}</button>` : ''}
             <a class="btn btn-sm btn-ghost" href="/api/export/execucoes.csv?account=${account}">${icon('download')} CSV</a></div></div>
           <div class="card">${execTable(execs.slice().reverse())}</div>
         </section>`;

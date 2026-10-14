@@ -12,8 +12,13 @@ const dayY = (iso) => f.date(`${iso}T12:00:00-03:00`, { year: true });
 function statusBadge(m) {
   if (m.status === 'fechado') return `<span class="badge badge-ok" title="Todos os pregões do mês têm nota de corretagem importada">${icon('check')} Fechado com notas</span>`;
   if (m.status === 'sem_operacoes') return '<span class="badge">Sem operações</span>';
-  const miss = m.missing_days?.length || 0;
-  return `<span class="badge badge-est" title="Sem nota de corretagem em ${miss} pregão(ões): preços, custos e IRRF podem estar estimados">Estimado${miss ? ` · faltam ${miss} nota(s)` : ''}</span>`;
+  const missDays = m.missing_days?.length || 0;
+  const totalOps = (m.missing_days || []).reduce((acc, d) => acc + (d.executions || (d.operations?.length) || 1), 0);
+  const title = `Sem nota de corretagem em ${missDays} pregão(ões) (${totalOps} operação(ões) pendente(s)): preços, custos e IRRF estimados`;
+  const label = missDays === 1 && totalOps
+    ? `Estimado · falta nota (${totalOps} op)`
+    : `Estimado${missDays ? ` · faltam ${missDays} pregão(ões)` : ''}`;
+  return `<span class="badge badge-est" title="${esc(title)}">${label}</span>`;
 }
 
 function tiles(rep, sim) {
@@ -98,8 +103,76 @@ function detail(m) {
       ${line('Prejuízo a compensar depois', `swing ${f.brl(m.swing_loss_carry)} · DT ${f.brl(m.day_loss_carry)}`)}
       ${m.irrf_carry ? line('Saldo de IRRF', f.brl(m.irrf_carry)) : ''}</dl></div>
   </div>
-  ${m.missing_days.length ? `<div class="note warning mt-3">${icon('alert')}<span>Sem nota de corretagem: ${m.missing_days.map((d) => `<strong>${esc(day(d.date))}</strong> (${esc(d.tickers.join(', '))})`).join(' · ')}.
-    <button class="link-btn" data-act="notes">Importar notas</button></span></div>` : ''}`;
+  ${missingNotesBlock(m)}`;
+}
+
+function missingNotesBlock(m) {
+  if (!m.missing_days || !m.missing_days.length) return '';
+  return `<div class="note warning mt-3" style="display:flex;flex-direction:column;gap:10px;align-items:stretch">
+    <div style="display:flex;gap:8px;align-items:flex-start">
+      ${icon('alert')}
+      <div style="flex:1">
+        <strong>Faltam notas de corretagem neste mês (${m.missing_days.length} pregão${m.missing_days.length > 1 ? 'ões' : ''}):</strong>
+        <span class="cell-sub" style="margin-top:2px;display:block">
+          Preços, custos e IRRF estão estimados para as operações abaixo até a importação das respectivas notas.
+        </span>
+      </div>
+      <button class="btn btn-sm btn-primary" data-act="notes" style="flex:none">${icon('download')} Importar notas</button>
+    </div>
+    <div class="stack" style="gap:8px;margin-top:4px">
+      ${m.missing_days.map((d) => {
+        const hasNotes = d.imported_notes && d.imported_notes.length > 0;
+        const notesLabel = hasNotes
+          ? `<span class="chip" style="height:22px;padding:0 7px;font-size:0.7rem;background:rgba(34,211,166,0.1);border-color:rgba(34,211,166,0.3);color:var(--accent)" title="Notas já registradas neste dia">
+              ${icon('check')} Nota${d.imported_notes.length > 1 ? 's' : ''} ${d.imported_notes.map((n) => `nº ${n.number} (${esc(n.broker)})`).join(', ')} importada${d.imported_notes.length > 1 ? 's' : ''}
+            </span>`
+          : '';
+        const ops = d.operations || [];
+        return `<div style="background:rgba(5,9,22,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:var(--r-md);padding:8px 12px">
+          <div class="row-between wrap" style="gap:6px;margin-bottom:6px">
+            <div class="row wrap" style="gap:6px">
+              <strong>${esc(dayY(d.date))}</strong>
+              <span class="cell-sub">(${d.executions} operação${d.executions > 1 ? 'ões' : ''} pendente${d.executions > 1 ? 's' : ''})</span>
+              ${notesLabel}
+            </div>
+            ${hasNotes ? `<span class="hint" style="font-size:0.72rem">Operou mais de um mercado? Corretoras (ex: Genial) emitem notas separadas para Ações e Opções.</span>` : ''}
+          </div>
+          ${ops.length ? `
+            <div class="table-wrap">
+              <table class="table table-compact" style="font-size:0.78rem">
+                <thead>
+                  <tr>
+                    <th>Lado</th>
+                    <th>Ativo</th>
+                    <th>Classe</th>
+                    <th class="r">Qtd</th>
+                    <th class="r">Preço</th>
+                    <th class="r">Volume</th>
+                    <th class="r">Horário</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${ops.map((op) => `
+                    <tr>
+                      <td><span class="badge ${op.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${op.side === 'BUY' ? 'C' : 'V'}</span></td>
+                      <td><span class="ticker">${esc(op.ticker)}</span></td>
+                      <td class="cell-sub">${esc(f.ASSET_LABELS[op.asset_class] || op.asset_class)}</td>
+                      <td class="num r">${f.qty(op.quantity)}</td>
+                      <td class="num r">${f.price(op.price)}</td>
+                      <td class="num r font-medium">${f.brl(op.value)}</td>
+                      <td class="num r cell-sub">${esc(f.time(op.executed_at))}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : `
+            <div class="cell-sub">Ativos pendentes: <strong>${esc(d.tickers.join(', '))}</strong></div>
+          `}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
 function monthsTable(rows, selected) {
@@ -154,7 +227,7 @@ export default {
           <p class="sub">Imposto de renda das suas operações reais. O mês só fica <strong>fechado</strong> com as notas de corretagem de todos os pregões; sem elas, o valor é <strong>estimado</strong>.</p></div>
           <div class="row wrap"><button class="btn btn-primary" data-act="notes">${icon('download')} Importar notas de corretagem</button></div></div>
         ${rep.coverage.missing.length ? `<div class="banner warning">${icon('alert')}<div class="grow"><strong>${rep.coverage.missing.length} pregão(ões) sem nota:</strong>
-          ${rep.coverage.missing.slice(-8).map((d) => esc(dayY(d.date))).join(', ')}${rep.coverage.missing.length > 8 ? '…' : ''}. Importe as notas para fechar o IR com os valores reais.</div>
+          ${rep.coverage.missing.slice(-8).map((d) => `${esc(dayY(d.date))}${d.tickers?.length ? ` (${esc(d.tickers.join(', '))})` : ''}`).join(', ')}${rep.coverage.missing.length > 8 ? '…' : ''}. Importe as notas para fechar o IR com os valores reais.</div>
           <button class="btn btn-sm" data-act="notes">Importar</button></div>` : ''}
         ${tiles(rep, sim)}
         <section class="section">
