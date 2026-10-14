@@ -394,3 +394,70 @@ def test_same_day_two_notes_and_coverage(tmp_db):
     assert cov3["days_covered"] == 1 and cov3["days_total"] == 1
     assert cov3["months"]["2026-10"]["missing"] == []
     assert cov3["months"]["2026-10"]["complete"] is True
+
+
+def test_reconcile_existing_note_with_pending_execution(tmp_db):
+    """
+    Cenário real: a nota já foi inserida no banco de dados (ex: importação anterior parcial),
+    mas a execução de BHIA3 está registrada com note_id IS NULL.
+    Ao reler a nota, o sistema deve reconhecer que ela já existe no banco, mas vincular
+    a execução pendente a ela e permitir apply_preview para completar a cobertura.
+    """
+    # 1. Cria execução pendente sem nota
+    ex = journal.add_execution({
+        "ticker": "BHIA3", "side": "BUY", "quantity": 1000, "price": 1.50,
+        "executed_at": "2026-10-09T10:15:00-03:00", "fees": 0.0,
+    }, account="real")
+
+    # 2. Simula que a nota 13516 já existe no banco (ex: importada vazia anteriormente)
+    with db.transaction() as c:
+        cur = c.execute(
+            "INSERT INTO notes(broker, number, trade_date, gross_value, total_costs, b3_fees, brokerage, imported_at) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            ("Genial", "13516", "2026-10-09", 1500.0, 1.48, 0.40, 1.08, "2026-10-09T12:00:00-03:00"),
+        )
+        existing_nid = cur.lastrowid
+
+    # Coverage acusa pendência
+    cov = bn.coverage()
+    assert cov["days_covered"] == 0
+    assert cov["months"]["2026-10"]["missing"][0]["tickers"] == ["BHIA3"]
+
+    # 3. Lê o PDF da nota 13516
+    prev = bn.build_preview([("acoes_13516.pdf", make_pdf([GENIAL_STOCKS_13516]))])
+    assert len(prev["notes"]) == 1
+    n = prev["notes"][0]
+    assert n["already_imported"] is True
+    assert n["existing_id"] == existing_nid
+    assert n["has_pending_actions"] is True
+
+    g = n["groups"][0]
+    assert g["ticker"] == "BHIA3"
+    assert g["already_linked"] is False
+    assert g["action"] == "update"
+    assert len(g["matches"]) == 1
+    assert g["matches"][0]["id"] == ex["id"]
+
+    # 4. Aplica o preview
+    res = bn.apply_preview(prev)
+    assert res["notes"] == 1
+    assert res["updated"] == 1
+
+    # 5. A execução agora está vinculada ao existing_nid com custos reais
+    ex_updated = next(e for e in journal.list_executions() if e["id"] == ex["id"])
+    assert ex_updated["note_id"] == existing_nid
+    assert ex_updated["fees"] == pytest.approx(1.48)
+    assert ex_updated["fees_source"] == "note"
+
+    # 6. Coverage agora está 100%
+    cov2 = bn.coverage()
+    assert cov2["days_covered"] == 1
+    assert cov2["months"]["2026-10"]["complete"] is True
+
+    # 7. Se reler novamente agora que tudo está vinculado:
+    again = bn.build_preview([("acoes_13516.pdf", make_pdf([GENIAL_STOCKS_13516]))])
+    assert again["notes"][0]["already_imported"] is True
+    assert again["notes"][0]["has_pending_actions"] is False
+    assert again["notes"][0]["groups"][0]["already_linked"] is True
+    assert again["notes"][0]["groups"][0]["action"] == "skip"
+    assert bn.apply_preview(again)["notes"] == 0

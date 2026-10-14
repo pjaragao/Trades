@@ -25,14 +25,15 @@ function groupRow(n, g, ni, gi) {
     : '<span class="faint">—</span>';
   const diffQ = r && Math.abs(r.quantity - g.quantity) > 1e-6;
   const diffP = r && Math.abs(r.price - g.price) > 0.00005;
+  const isSelectDisabled = Boolean(g.already_linked);
   return `<tr>
     <td>${ticker}${g.day_trade ? ' <span class="badge badge-plain">DT</span>' : ''}</td>
     <td><span class="badge ${g.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${g.side === 'BUY' ? 'C' : 'V'}</span></td>
     <td class="num r"><span class="${diffQ ? 'warn-text' : ''}">${f.qty(g.quantity)}</span> × <span class="${diffP ? 'warn-text' : ''}">${f.price(g.price)}</span><span class="cell-sub">${f.brl(g.value)}</span></td>
     <td class="num r">${f.brl(g.fees)}</td>
     <td class="num r">${reg}</td>
-    <td style="min-width:180px;max-width:260px"><select class="select" style="height:30px" data-action="${ni}:${gi}" ${n.already_imported ? 'disabled' : ''}>${actionOptions(g)}</select>
-      <span class="cell-sub">${esc(g.match_note || '')}</span></td>
+    <td style="min-width:180px;max-width:260px"><select class="select" style="height:30px" data-action="${ni}:${gi}" ${isSelectDisabled ? 'disabled' : ''}>${actionOptions(g)}</select>
+      <span class="cell-sub ${!g.already_linked && g.action !== 'skip' ? 'gain' : ''}">${esc(g.match_note || '')}</span></td>
   </tr>`;
 }
 
@@ -50,13 +51,20 @@ function extrasBlock(n, ni) {
 
 function noteCard(n, ni) {
   const fees = n.fees || {};
+  const statusBadge = n.already_imported
+    ? `<div class="row wrap" style="gap:8px;align-items:center">
+        <span class="badge ${n.has_pending_actions ? 'badge-buy' : 'badge-plain'}">${n.has_pending_actions ? 'já importada (com pendências)' : 'já importada'}</span>
+        ${n.existing_id ? `<button type="button" class="btn btn-sm btn-ghost btn-danger" style="color:var(--danger);padding:2px 8px;height:24px;font-size:0.75rem" data-del-note="${n.existing_id}" title="Desfazer importação anterior desta nota no sistema para reimportar do zero">${icon('trash')} Desfazer importação anterior</button>` : ''}
+      </div>`
+    : `<span class="hint">${esc(n.file)}</span>`;
+
   return `<div class="card mt-4">
     <div class="card-head"><h3>${esc(n.broker)} · nota ${esc(n.number)} · ${n.trade_date ? esc(f.date(n.trade_date + 'T12:00:00-03:00', { year: true })) : 'sem data'}</h3>
-      ${n.already_imported ? '<span class="badge">já importada</span>' : `<span class="hint">${esc(n.file)}</span>`}</div>
+      ${statusBadge}</div>
     ${n.warnings.length ? `<div class="card-body"><ul class="notes">${n.warnings.map((w) => `<li class="note warning">${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul></div>` : ''}
     <div class="table-wrap"><table class="table notes-diff"><thead><tr><th>Ativo</th><th>Lado</th><th class="r">Nota: qtd × preço</th><th class="r">Custos reais</th><th class="r">Registrado por você</th><th>O que fazer</th></tr></thead>
       <tbody>${n.groups.map((g, gi) => groupRow(n, g, ni, gi)).join('')}</tbody></table></div>
-    ${n.already_imported ? '' : extrasBlock(n, ni)}
+    ${extrasBlock(n, ni)}
     <div class="card-foot"><dl class="kv">
       <dt>Taxas B3 (liquidação + registro + emolumentos…)</dt><dd>${f.brl(n.b3_fees)}</dd>
       <dt>Corretagem + ISS + outros</dt><dd>${f.brl(n.broker_fees)}</dd>
@@ -184,8 +192,25 @@ export async function openNotesImport() {
   m.el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-del-note]');
     if (!b) return;
-    const ok = await confirmDialog({ title: 'Desfazer importação', message: 'Apagar as execuções criadas por esta nota e devolver as que ela ajustou ou excluiu ao estado anterior (quantidade, preço, data e custos)?', confirmText: 'Desfazer', danger: true });
+    const ok = await confirmDialog({
+      title: 'Desfazer importação da nota',
+      message: 'Apagar as execuções criadas por esta nota e devolver as que ela ajustou ou excluiu ao estado anterior (quantidade, preço, data e custos)?',
+      confirmText: 'Desfazer',
+      danger: true,
+    });
     if (!ok) return;
-    try { await del(`/api/notes/${b.dataset.delNote}`); m.close(); toast('Importação desfeita', 'info'); emit('data-changed'); } catch (err) { toastError(err); }
+    try {
+      await del(`/api/notes/${b.dataset.delNote}`);
+      toast('Importação da nota desfeita.', 'info');
+      emit('data-changed');
+      const fi = el('#nf');
+      if (fi && fi.files && fi.files.length) {
+        el('#nread').click();
+      } else {
+        m.close();
+      }
+    } catch (err) {
+      toastError(err);
+    }
   });
 }
