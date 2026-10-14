@@ -80,18 +80,22 @@ export function ticketCard(sig, { kind = 'new', isNew = false, compact = false }
   registry.set(sig.id, { sig, ticket: t });
   const basis = sig.lado === 'SELL' ? 'bid' : 'ask';
   const sideCls = sig.lado === 'SELL' ? 'sell' : '';
-  const kindLabel = { new: 'Novo sinal', reminder: 'Lembrete', detail: 'Boleta pronta' }[kind] || 'Sinal';
+  const kindLabel = { new: 'Novo sinal', reminder: 'Lembrete', detail: 'Boleta pronta', reentry: 'Voltou ao preço' }[kind] || 'Sinal';
   const when = sig.timestamp_entrada ? `${f.ago(sig.timestamp_entrada)}` : '';
+  const pr = sig.price_return;
   return `
-  <article class="card ticket ${sideCls} ${kind === 'reminder' ? 'reminder' : ''} ${isNew ? 'is-new' : ''}" data-sid="${esc(sig.id)}">
+  <article class="card ticket ${sideCls} ${kind === 'reminder' ? 'reminder' : ''} ${kind === 'reentry' ? 'reentry' : ''} ${isNew ? 'is-new' : ''}" data-sid="${esc(sig.id)}">
     <div class="ticket-head">
       ${avatar(sig.trader)}
       <div class="who">
         <div class="who-name">${esc(sig.trader)} ${copyableBadge(sig.profile)}</div>
         <div class="who-sub">${esc(sig.produto || '')}${when ? ` · ${esc(when)}` : ''}</div>
       </div>
-      <span class="ticket-kind">${esc(kindLabel)}</span>
+      <span class="ticket-kind ${kind === 'reentry' ? 'badge-ok' : ''}">${esc(kindLabel)}</span>
     </div>
+    ${pr ? `<div class="note success mt-2 mb-2" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.3)">
+      ${icon('check')} <span><strong>Preço voltou ao patamar original!</strong> Você ignorou porque o preço andou, mas após <strong>${esc(pr.duration_formatted)}</strong> o ativo retornou a <strong>${f.brl(pr.returned_price)}</strong> (entrada original ${f.brl(pr.entry_price)}).</span>
+    </div>` : ''}
     <div class="ticket-asset">
       <span class="ticker">${esc(sig.ticker)}</span>
       <span class="badge ${sig.lado === 'SELL' ? 'badge-sell' : 'badge-buy'}">${sig.lado === 'SELL' ? 'Venda' : 'Compra'}</span>

@@ -92,6 +92,23 @@ def decide(signal_id):
     return jsonify({"ok": True, "decision": result})
 
 
+@bp.get("/signals/price-returns")
+def price_returns_history():
+    from src.services import price_returns
+
+    limit = min(int(request.args.get("limit", 50)), 200)
+    return jsonify({"items": price_returns.list_price_returns(limit=limit)})
+
+
+@bp.post("/signals/<signal_id>/dismiss-return")
+def dismiss_price_return(signal_id):
+    from src.services import price_returns
+
+    price_returns.dismiss_price_return(signal_id)
+    alerts.mark_signal_alerts_read(signal_id, ["price_returned"])
+    return jsonify({"ok": True})
+
+
 @bp.get("/traders")
 def traders():
     prefs = get_prefs()
@@ -101,3 +118,4 @@ def traders():
         r["followed"] = (not followed or r["trader"].lower() in followed) and (
             not prefs["follow"]["asset_classes"] or r["asset_class"] in prefs["follow"]["asset_classes"])
     return jsonify(rows)
+

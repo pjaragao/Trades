@@ -28,14 +28,14 @@ function rows(items) {
       <td class="num r">${f.brl(s.preco_entrada)}</td>
       <td class="num r">${priceNow(s)}${s.status === 'CLOSED' ? `<span class="cell-sub">${esc(f.dateTime(s.timestamp_saida))}</span>` : ''}</td>
       <td class="num r">${retCell(s)}</td>
-      <td>${s.status === 'OPEN' ? decisionBadge(s.decision) : (s.decision ? decisionBadge(s.decision) : '<span class="badge">Encerrado</span>')}</td>
+      <td>${s.status === 'OPEN' ? decisionBadge(s.decision) : (s.decision ? decisionBadge(s.decision) : '<span class="badge">Encerrado</span>')}${s.price_return ? ` <span class="badge badge-ok" title="Preço voltou após ${esc(s.price_return.duration_formatted)}">Voltou</span>` : ''}</td>
     </tr>`).join('');
 }
 
 function mobileItems(items) {
   return items.map((s) => `
     <div class="sig-item" data-sid="${esc(s.id)}">
-      <div><span class="ticker">${esc(s.ticker)}</span> <span class="badge ${s.lado === 'SELL' ? 'badge-sell' : 'badge-buy'}">${s.lado === 'SELL' ? 'V' : 'C'}</span></div>
+      <div><span class="ticker">${esc(s.ticker)}</span> <span class="badge ${s.lado === 'SELL' ? 'badge-sell' : 'badge-buy'}">${s.lado === 'SELL' ? 'V' : 'C'}</span>${s.price_return ? ' <span class="badge badge-ok">Voltou</span>' : ''}</div>
       <div class="num r">${retCell(s)}</div>
       <div class="muted" style="font-size:var(--fs-xs)">${esc(s.trader)} · ${esc(f.ago(s.timestamp_entrada))}</div>
       <div style="text-align:right">${s.status === 'OPEN' ? decisionBadge(s.decision) : '<span class="badge">Encerrado</span>'}</div>
@@ -96,7 +96,7 @@ export default {
             <select class="select" data-filter="trader"><option value="">Todos os analistas</option></select>
             <select class="select" data-filter="asset_class"><option value="">Todas as classes</option>
               ${Object.entries(f.ASSET_LABELS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
-            <select class="select" data-filter="decision"><option value="">Qualquer decisão</option><option value="none">Sem decisão</option><option value="executed">Executados</option><option value="ignored">Ignorados</option><option value="snoozed">Adiados</option></select>
+            <select class="select" data-filter="decision"><option value="">Qualquer decisão</option><option value="none">Sem decisão</option><option value="returned">Voltou ao preço</option><option value="executed">Executados</option><option value="ignored">Ignorados</option><option value="snoozed">Adiados</option></select>
             <div class="input-group grow"><span class="prefix">${icon('search')}</span><input class="input" data-filter="q" placeholder="Buscar ativo (ex.: BBAS)"></div>
           </div>
           <div class="card" id="sig-list">${loading()}</div>
