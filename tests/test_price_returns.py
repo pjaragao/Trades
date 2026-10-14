@@ -22,6 +22,7 @@ def test_is_price_drift_reason():
     assert price_returns.is_price_drift_reason("Preço andou") is True
     assert price_returns.is_price_drift_reason("Ficou longe") is True
     assert price_returns.is_price_drift_reason("Sem capital livre") is False
+    assert price_returns.is_price_drift_reason("Trade semelhante em aberto") is False
     assert price_returns.is_price_drift_reason("Não gosto do ativo") is False
     assert price_returns.is_price_drift_reason(None) is False
 

@@ -58,7 +58,8 @@ export function similarHtml(sig) {
     return `<div class="note ${x.relation === 'opposite' ? 'info' : 'warning'}">${icon(x.relation === 'opposite' ? 'info' : 'alert')}<span>
       <strong>${SIMILAR_HEAD[x.relation]}:</strong> <a href="#/carteira">${esc(x.ticker)}</a>${what ? ` (${esc(what)})` : ''}, ${who} —
       ${f.qty(x.quantity)} un · médio ${f.brl(x.avg_price)}${pnl}.${tail}
-      ${x.relation === 'same_ticker' ? ` <button class="link-btn" data-action="link-position" data-position="${esc(x.cycle_id)}">É este trade — vincular</button>` : ''}</span></div>`;
+      ${x.relation === 'same_ticker' ? ` <button class="link-btn" data-action="link-position" data-position="${esc(x.cycle_id)}">É este trade — vincular</button>` : ''}
+      ${x.relation === 'same_direction' ? ` <button class="link-btn" data-action="ignore-similar">Ignorar por trade semelhante</button>` : ''}</span></div>`;
   }).join('')}</div>`;
 }
 
@@ -185,7 +186,7 @@ export function openExitOrder(pos) {
 }
 
 // ---------- Interações (delegação de eventos)
-const IGNORE_REASONS = ['Preço já andou demais', 'Sem capital livre', 'Não gosto do ativo', 'Perdi o horário', 'Outro motivo'];
+const IGNORE_REASONS = ['Preço já andou demais', 'Trade semelhante em aberto', 'Sem capital livre', 'Não gosto do ativo', 'Perdi o horário', 'Outro motivo'];
 const SNOOZE = [[30, '30 minutos'], [60, '1 hora'], [180, '3 horas'], [60 * 18, 'Amanhã cedo']];
 
 async function refreshTicket(card) {
@@ -260,6 +261,14 @@ export function bindTickets(root, { getPositions = () => [] } = {}) {
         try {
           await post(`/api/signals/${encodeURIComponent(sig.id)}/link-position`, { cycle_id: btn.dataset.position });
           toast(`Sinal de ${sig.trader} vinculado à sua posição em ${sig.ticker} e marcado como executado.`, 'success');
+          emit('data-changed');
+        } catch (err) { toastError(err); }
+        return;
+      }
+      if (action === 'ignore-similar') {
+        try {
+          await post(`/api/signals/${encodeURIComponent(sig.id)}/decision`, { status: 'ignored', reason: 'Trade semelhante em aberto' });
+          toast(`${sig.ticker} ignorado (Trade semelhante em aberto)`, 'info');
           emit('data-changed');
         } catch (err) { toastError(err); }
         return;
