@@ -354,7 +354,7 @@ def test_same_day_two_notes_and_coverage(tmp_db):
     journal.add_execution({
         "ticker": "BBASK254", "side": "SELL", "quantity": 1800, "price": 1.34,
         "executed_at": "2026-10-09T11:30:00-03:00", "fees": 3.00,
-    }, account="real")
+    }, allow_short=True, account="real")
 
     # 1. Sem notas: coverage indica ambas as operações com detalhes
     cov = bn.coverage()

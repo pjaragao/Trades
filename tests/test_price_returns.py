@@ -33,21 +33,23 @@ def test_price_return_detection_buy(tmp_db):
 
     with db.transaction() as c:
         c.execute("""
-            INSERT INTO signals(id, trades_id, trader, ativo, ticker, operacao, lado, preco_entrada, status, first_seen_at)
-            VALUES('sig-buy-1', '101', 'Analista XP', 'PETROBRAS', 'PETR4', 'COMPRA', 'BUY', 38.00, 'OPEN', ?)
+            INSERT INTO signals(id, source, trades_id, trader, ticker, lado, asset_class, preco_entrada, status, first_seen_at)
+            VALUES('sig-buy-1', 'tradingfloors', '101', 'Analista XP', 'PETR4', 'BUY', 'ACAO', 38.00, 'OPEN', ?)
         """, (decided_time,))
         c.execute("""
             INSERT INTO decisions(signal_id, status, reason, decided_at)
             VALUES('sig-buy-1', 'ignored', 'Preço já andou demais', ?)
         """, (decided_time,))
+        upsert_quote(c, "PETR4", 39.50, source="test")
 
     # 2. Cotação ainda alta (R$ 39,50): não deve detectar retorno
-    upsert_quote("PETR4", 39.50, source="test")
     res = price_returns.check_price_returns()
     assert len(res) == 0
 
     # 3. Cotação recuou para R$ 37,90 (abaixo da entrada de 38,00): deve detectar!
-    upsert_quote("PETR4", 37.90, source="test")
+    with db.transaction() as c:
+        upsert_quote(c, "PETR4", 37.90, source="test")
+
     res = price_returns.check_price_returns()
     assert len(res) == 1
     r = res[0]
@@ -84,20 +86,22 @@ def test_price_return_detection_sell(tmp_db):
 
     with db.transaction() as c:
         c.execute("""
-            INSERT INTO signals(id, trades_id, trader, ativo, ticker, operacao, lado, preco_entrada, status, first_seen_at)
-            VALUES('sig-sell-1', '102', 'Analista Genial', 'VALE', 'VALE3', 'VENDA', 'SELL', 60.00, 'OPEN', ?)
+            INSERT INTO signals(id, source, trades_id, trader, ticker, lado, asset_class, preco_entrada, status, first_seen_at)
+            VALUES('sig-sell-1', 'tradingfloors', '102', 'Analista Genial', 'VALE3', 'SELL', 'ACAO', 60.00, 'OPEN', ?)
         """, (decided_time,))
         c.execute("""
             INSERT INTO decisions(signal_id, status, reason, decided_at)
             VALUES('sig-sell-1', 'ignored', 'Preço já andou demais', ?)
         """, (decided_time,))
+        upsert_quote(c, "VALE3", 58.00, source="test")
 
     # 2. Cotação caiu para R$ 58,00 (longe da venda): não detecta
-    upsert_quote("VALE3", 58.00, source="test")
     assert len(price_returns.check_price_returns()) == 0
 
     # 3. Cotação subiu de volta para R$ 60,10 (favorável para venda de novo): deve detectar!
-    upsert_quote("VALE3", 60.10, source="test")
+    with db.transaction() as c:
+        upsert_quote(c, "VALE3", 60.10, source="test")
+
     res = price_returns.check_price_returns()
     assert len(res) == 1
     assert res[0]["signal_id"] == "sig-sell-1"
@@ -109,13 +113,13 @@ def test_ignore_reason_without_drift_is_not_detected(tmp_db):
     # Sinal ignorado por outro motivo (ex: sem capital) não deve disparar retorno ao preço
     with db.transaction() as c:
         c.execute("""
-            INSERT INTO signals(id, trades_id, trader, ativo, ticker, operacao, lado, preco_entrada, status, first_seen_at)
-            VALUES('sig-other-1', '103', 'Trader', 'ITAU', 'ITUB4', 'COMPRA', 'BUY', 30.00, 'OPEN', ?)
+            INSERT INTO signals(id, source, trades_id, trader, ticker, lado, asset_class, preco_entrada, status, first_seen_at)
+            VALUES('sig-other-1', 'tradingfloors', '103', 'Trader', 'ITUB4', 'BUY', 'ACAO', 30.00, 'OPEN', ?)
         """, (now_iso(),))
         c.execute("""
             INSERT INTO decisions(signal_id, status, reason, decided_at)
             VALUES('sig-other-1', 'ignored', 'Sem capital livre', ?)
         """, (now_iso(),))
+        upsert_quote(c, "ITUB4", 29.50, source="test")
 
-    upsert_quote("ITUB4", 29.50, source="test")
     assert len(price_returns.check_price_returns()) == 0

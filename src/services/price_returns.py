@@ -93,7 +93,7 @@ def check_price_returns(conn=None) -> List[Dict[str, Any]]:
             else:
                 current_price = float(quote["price"])
 
-            side = row.get("lado") or ("BUY" if row.get("operacao") == "COMPRA" else "SELL")
+            side = row.get("lado") or "BUY"
             # Critério de retorno ao preço:
             # BUY: preço recuou para <= entry_price (+ tolerância 0.2% para ruído de spread)
             # SELL: preço subiu para >= entry_price (- tolerância 0.2%)
@@ -162,7 +162,7 @@ def list_price_returns(limit: int = 50, conn=None) -> List[Dict[str, Any]]:
     """Lista histórico de sinais que voltaram ao preço."""
     with db.connection(conn) as c:
         rows = [dict(r) for r in c.execute(f"""
-            SELECT pr.*, s.trader, s.operacao, s.status as signal_status, s.ativo, s.asset_class
+            SELECT pr.*, s.trader, s.lado, s.status as signal_status, s.underlying, s.asset_class
             FROM signal_price_returns pr
             JOIN signals s ON s.id = pr.signal_id
             ORDER BY pr.returned_at DESC, pr.id DESC
@@ -181,7 +181,7 @@ def active_price_returns(conn=None) -> List[Dict[str, Any]]:
     today_str = now.date().isoformat()
     with db.connection(conn) as c:
         rows = [dict(r) for r in c.execute("""
-            SELECT pr.*, s.trader, s.operacao, s.status as signal_status, s.ativo, s.asset_class
+            SELECT pr.*, s.trader, s.lado, s.status as signal_status, s.underlying, s.asset_class
             FROM signal_price_returns pr
             JOIN signals s ON s.id = pr.signal_id
             WHERE s.status = 'OPEN' AND pr.dismissed = 0 AND date(pr.returned_at) = ?
