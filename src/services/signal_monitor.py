@@ -319,6 +319,14 @@ class SignalMonitor:
                                         signal_id=sig["id"], ticker=p["ticker"], severity="danger",
                                         dedup_key=f"expiry:{p['cycle_id']}:{sig['expiration']}")
 
+        # Sinais ignorados por preço que voltaram ao preço de entrada original
+        try:
+            from src.services import price_returns
+            price_returns.check_price_returns(conn=c)
+        except Exception as exc:
+            log.warning("Erro ao verificar retornos ao preço: %s", exc)
+
+
 
 def _summ(result: Dict[str, Any]) -> Dict[str, Any]:
     return {

@@ -14,7 +14,7 @@ from src.core.market_hours import option_expiration
 UNDERLYING_BY_PREFIX = {
     "ABEV": "ABEV3", "ALOS": "ALOS3", "ANIM": "ANIM3", "ASAI": "ASAI3", "AUAU": "AUAU3", "AXIA": "AXIA3",
     "AZUL": "AZUL4", "AZZA": "AZZA3", "B3SA": "B3SA3", "BBAS": "BBAS3", "BBDC": "BBDC4", "BBSE": "BBSE3",
-    "BEEF": "BEEF3", "BOVA": "BOVA11", "BPAC": "BPAC11", "BRAP": "BRAP4", "BRAV": "BRAV3", "BRFS": "BRFS3",
+    "BEEF": "BEEF3", "BHIA": "BHIA3", "BOVA": "BOVA11", "BPAC": "BPAC11", "BRAP": "BRAP4", "BRAV": "BRAV3", "BRFS": "BRFS3",
     "BRKM": "BRKM5", "CEAB": "CEAB3", "CMIG": "CMIG4", "CMIN": "CMIN3", "COGN": "COGN3", "CPFE": "CPFE3",
     "CPLE": "CPLE6", "CRFB": "CRFB3", "CSAN": "CSAN3", "CSNA": "CSNA3", "CYRE": "CYRE3", "DIRR": "DIRR3",
     "ECOR": "ECOR3", "EGIE": "EGIE3", "ELET": "ELET3", "EMBJ": "EMBJ3", "EMBR": "EMBR3", "ENEV": "ENEV3",

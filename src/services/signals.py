@@ -277,6 +277,8 @@ def list_signals(
             params += follow["asset_classes"]
     if decision == "none":
         where.append("d.signal_id IS NULL")
+    elif decision == "returned":
+        where.append("s.id IN (SELECT signal_id FROM signal_price_returns)")
     elif decision in ("executed", "ignored", "snoozed"):
         where.append("d.status = ?")
         params.append(decision)
@@ -288,8 +290,20 @@ def list_signals(
         total = c.execute(f"SELECT COUNT(*) {base}", params).fetchone()[0]
         rows = [dict(r) for r in c.execute(f"SELECT s.* {base} ORDER BY {order} LIMIT ? OFFSET ?", params + [limit, offset])]
         decisions = _decisions_for(c, [r["id"] for r in rows])
+        ret_map = {}
+        if rows:
+            for r in c.execute(f"SELECT * FROM signal_price_returns WHERE signal_id IN ({','.join('?' * len(rows))}) ORDER BY returned_at DESC", [r["id"] for r in rows]):
+                ret_map.setdefault(r["signal_id"], dict(r))
         traders = [r[0] for r in c.execute("SELECT DISTINCT trader FROM signals ORDER BY trader")]
-    items = [hydrate(r, prefs, decisions.get(r["id"])) for r in rows]
+    from src.services.price_returns import fmt_duration
+    items = []
+    for r in rows:
+        h = hydrate(r, prefs, decisions.get(r["id"]))
+        if r["id"] in ret_map:
+            ret_item = ret_map[r["id"]]
+            ret_item["duration_formatted"] = fmt_duration(ret_item.get("duration_seconds", 0))
+            h["price_return"] = ret_item
+        items.append(h)
     return {"total": total, "limit": limit, "offset": offset, "items": items, "traders": traders}
 
 

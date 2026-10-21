@@ -25,21 +25,22 @@ function groupRow(n, g, ni, gi) {
     : '<span class="faint">—</span>';
   const diffQ = r && Math.abs(r.quantity - g.quantity) > 1e-6;
   const diffP = r && Math.abs(r.price - g.price) > 0.00005;
+  const isSelectDisabled = Boolean(g.already_linked);
   return `<tr>
     <td>${ticker}${g.day_trade ? ' <span class="badge badge-plain">DT</span>' : ''}</td>
     <td><span class="badge ${g.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${g.side === 'BUY' ? 'C' : 'V'}</span></td>
     <td class="num r"><span class="${diffQ ? 'warn-text' : ''}">${f.qty(g.quantity)}</span> × <span class="${diffP ? 'warn-text' : ''}">${f.price(g.price)}</span><span class="cell-sub">${f.brl(g.value)}</span></td>
     <td class="num r">${f.brl(g.fees)}</td>
     <td class="num r">${reg}</td>
-    <td style="min-width:180px;max-width:260px"><select class="select" style="height:30px" data-action="${ni}:${gi}" ${n.already_imported ? 'disabled' : ''}>${actionOptions(g)}</select>
-      <span class="cell-sub">${esc(g.match_note || '')}</span></td>
+    <td style="min-width:180px;max-width:260px"><select class="select" style="height:30px" data-action="${ni}:${gi}" ${isSelectDisabled ? 'disabled' : ''}>${actionOptions(g)}</select>
+      <span class="cell-sub ${!g.already_linked && g.action !== 'skip' ? 'gain' : ''}">${esc(g.match_note || '')}</span></td>
   </tr>`;
 }
 
 function extrasBlock(n, ni) {
   if (!n.extras || !n.extras.length) return '';
   return `<div class="card-body"><div class="note warning">${icon('alert')}<span>Registradas no pregão de ${esc(day(n.trade_date))}, mas fora desta nota
-      (podem ser de outra corretora — importe a outra nota ou exclua o que não aconteceu):</span></div></div>
+      (podem ser de outra nota/corretora, ou outro mercado como Ações vs Opções — importe a outra nota ou exclua o que não aconteceu):</span></div></div>
     <div class="table-wrap"><table class="table"><tbody>${n.extras.map((x, xi) => `<tr>
       <td><span class="ticker">${esc(x.ticker)}</span></td>
       <td><span class="badge ${x.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${x.side === 'BUY' ? 'C' : 'V'}</span></td>
@@ -50,13 +51,20 @@ function extrasBlock(n, ni) {
 
 function noteCard(n, ni) {
   const fees = n.fees || {};
+  const statusBadge = n.already_imported
+    ? `<div class="row wrap" style="gap:8px;align-items:center">
+        <span class="badge ${n.has_pending_actions ? 'badge-buy' : 'badge-plain'}">${n.has_pending_actions ? 'já importada (com pendências)' : 'já importada'}</span>
+        ${n.existing_id ? `<button type="button" class="btn btn-sm btn-ghost btn-danger" style="color:var(--danger);padding:2px 8px;height:24px;font-size:0.75rem" data-del-note="${n.existing_id}" title="Desfazer importação anterior desta nota no sistema para reimportar do zero">${icon('trash')} Desfazer importação anterior</button>` : ''}
+      </div>`
+    : `<span class="hint">${esc(n.file)}</span>`;
+
   return `<div class="card mt-4">
     <div class="card-head"><h3>${esc(n.broker)} · nota ${esc(n.number)} · ${n.trade_date ? esc(f.date(n.trade_date + 'T12:00:00-03:00', { year: true })) : 'sem data'}</h3>
-      ${n.already_imported ? '<span class="badge">já importada</span>' : `<span class="hint">${esc(n.file)}</span>`}</div>
+      ${statusBadge}</div>
     ${n.warnings.length ? `<div class="card-body"><ul class="notes">${n.warnings.map((w) => `<li class="note warning">${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul></div>` : ''}
     <div class="table-wrap"><table class="table notes-diff"><thead><tr><th>Ativo</th><th>Lado</th><th class="r">Nota: qtd × preço</th><th class="r">Custos reais</th><th class="r">Registrado por você</th><th>O que fazer</th></tr></thead>
       <tbody>${n.groups.map((g, gi) => groupRow(n, g, ni, gi)).join('')}</tbody></table></div>
-    ${n.already_imported ? '' : extrasBlock(n, ni)}
+    ${extrasBlock(n, ni)}
     <div class="card-foot"><dl class="kv">
       <dt>Taxas B3 (liquidação + registro + emolumentos…)</dt><dd>${f.brl(n.b3_fees)}</dd>
       <dt>Corretagem + ISS + outros</dt><dd>${f.brl(n.broker_fees)}</dd>
@@ -69,13 +77,39 @@ function noteCard(n, ni) {
 
 export async function openNotesImport() {
   const m = openModal({ title: 'Importar notas de corretagem', wide: true, body: loading() });
-  let existing = { notes: [], calibration: null };
+  let existing = { notes: [], calibration: null, coverage: null };
   try { existing = await get('/api/notes'); } catch { /* segue */ }
   const cal = existing.calibration;
+  const pendingDays = Object.values(existing.coverage?.months || {}).flatMap((month) => month.missing || []);
+
   m.setBody(`
     <p class="muted">Envie os PDFs das notas (XP, Genial ou outra corretora no padrão SINACOR). <strong>A nota é a verdade:</strong> quantidade,
       preço, data do pregão e <strong>custos reais</strong> (rateados pelo valor) passam a valer no seu histórico; o que falta é criado e o que
       você registrou no pregão mas não está na nota aparece para manter ou excluir. Tudo pode ser desfeito. Importe em ordem cronológica.</p>
+    ${pendingDays.length ? `
+      <div class="card card-pad mt-3" style="background:rgba(234,179,8,0.06);border-color:rgba(234,179,8,0.25)">
+        <div class="row wrap" style="gap:8px;margin-bottom:6px">
+          <strong style="color:var(--warn);display:flex;align-items:center;gap:6px">${icon('alert')} Operações aguardando nota de corretagem:</strong>
+          <span class="hint" style="font-size:0.75rem">Se você operou ações e opções no mesmo dia, sua corretora (ex: Genial) gera notas separadas — envie ambos os PDFs.</span>
+        </div>
+        <div class="stack" style="gap:6px">
+          ${pendingDays.map((d) => `
+            <div class="row wrap" style="gap:8px;font-size:0.8rem;background:rgba(5,9,22,0.45);padding:6px 10px;border-radius:6px">
+              <strong>${esc(day(d.date))}:</strong>
+              ${(d.operations && d.operations.length ? d.operations : []).map((op) => `
+                <span class="chip" style="height:22px;padding:0 7px;font-size:0.72rem">
+                  <span class="badge ${op.side === 'BUY' ? 'badge-buy' : 'badge-sell'}" style="height:16px;padding:0 4px;font-size:0.65rem">${op.side === 'BUY' ? 'C' : 'V'}</span>
+                  <span class="ticker" style="margin-left:2px">${esc(op.ticker)}</span>
+                  <span class="cell-sub" style="margin-left:2px">${esc(f.ASSET_LABELS[op.asset_class] || op.asset_class)}</span>
+                  <span class="muted" style="margin-left:4px">${f.qty(op.quantity)} × ${f.price(op.price)}</span>
+                </span>
+              `).join('') || `<span>${esc(d.tickers.join(', '))}</span>`}
+              ${d.imported_notes && d.imported_notes.length ? `<span class="cell-sub gain" style="margin-left:auto">(já tem nota nº ${d.imported_notes.map((nr) => nr.number).join(', ')})</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
     <div class="form-grid mt-4">
       <div class="field"><label for="nf">Arquivos PDF</label><input id="nf" class="input" type="file" accept="application/pdf" multiple style="padding-top:7px"></div>
       <div class="field"><label for="np">Senha do PDF <span class="faint">(se houver)</span></label><input id="np" class="input" type="password" autocomplete="off" placeholder="XP: 3 primeiros dígitos do CPF">
@@ -158,8 +192,25 @@ export async function openNotesImport() {
   m.el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-del-note]');
     if (!b) return;
-    const ok = await confirmDialog({ title: 'Desfazer importação', message: 'Apagar as execuções criadas por esta nota e devolver as que ela ajustou ou excluiu ao estado anterior (quantidade, preço, data e custos)?', confirmText: 'Desfazer', danger: true });
+    const ok = await confirmDialog({
+      title: 'Desfazer importação da nota',
+      message: 'Apagar as execuções criadas por esta nota e devolver as que ela ajustou ou excluiu ao estado anterior (quantidade, preço, data e custos)?',
+      confirmText: 'Desfazer',
+      danger: true,
+    });
     if (!ok) return;
-    try { await del(`/api/notes/${b.dataset.delNote}`); m.close(); toast('Importação desfeita', 'info'); emit('data-changed'); } catch (err) { toastError(err); }
+    try {
+      await del(`/api/notes/${b.dataset.delNote}`);
+      toast('Importação da nota desfeita.', 'info');
+      emit('data-changed');
+      const fi = el('#nf');
+      if (fi && fi.files && fi.files.length) {
+        el('#nread').click();
+      } else {
+        m.close();
+      }
+    } catch (err) {
+      toastError(err);
+    }
   });
 }

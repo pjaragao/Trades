@@ -58,7 +58,8 @@ export function similarHtml(sig) {
     return `<div class="note ${x.relation === 'opposite' ? 'info' : 'warning'}">${icon(x.relation === 'opposite' ? 'info' : 'alert')}<span>
       <strong>${SIMILAR_HEAD[x.relation]}:</strong> <a href="#/carteira">${esc(x.ticker)}</a>${what ? ` (${esc(what)})` : ''}, ${who} —
       ${f.qty(x.quantity)} un · médio ${f.brl(x.avg_price)}${pnl}.${tail}
-      ${x.relation === 'same_ticker' ? ` <button class="link-btn" data-action="link-position" data-position="${esc(x.cycle_id)}">É este trade — vincular</button>` : ''}</span></div>`;
+      ${x.relation === 'same_ticker' ? ` <button class="link-btn" data-action="link-position" data-position="${esc(x.cycle_id)}">É este trade — vincular</button>` : ''}
+      ${x.relation === 'same_direction' ? ` <button class="link-btn" data-action="ignore-similar">Ignorar por trade semelhante</button>` : ''}</span></div>`;
   }).join('')}</div>`;
 }
 
@@ -80,18 +81,22 @@ export function ticketCard(sig, { kind = 'new', isNew = false, compact = false }
   registry.set(sig.id, { sig, ticket: t });
   const basis = sig.lado === 'SELL' ? 'bid' : 'ask';
   const sideCls = sig.lado === 'SELL' ? 'sell' : '';
-  const kindLabel = { new: 'Novo sinal', reminder: 'Lembrete', detail: 'Boleta pronta' }[kind] || 'Sinal';
+  const kindLabel = { new: 'Novo sinal', reminder: 'Lembrete', detail: 'Boleta pronta', reentry: 'Voltou ao preço' }[kind] || 'Sinal';
   const when = sig.timestamp_entrada ? `${f.ago(sig.timestamp_entrada)}` : '';
+  const pr = sig.price_return;
   return `
-  <article class="card ticket ${sideCls} ${kind === 'reminder' ? 'reminder' : ''} ${isNew ? 'is-new' : ''}" data-sid="${esc(sig.id)}">
+  <article class="card ticket ${sideCls} ${kind === 'reminder' ? 'reminder' : ''} ${kind === 'reentry' ? 'reentry' : ''} ${isNew ? 'is-new' : ''}" data-sid="${esc(sig.id)}">
     <div class="ticket-head">
       ${avatar(sig.trader)}
       <div class="who">
         <div class="who-name">${esc(sig.trader)} ${copyableBadge(sig.profile)}</div>
         <div class="who-sub">${esc(sig.produto || '')}${when ? ` · ${esc(when)}` : ''}</div>
       </div>
-      <span class="ticket-kind">${esc(kindLabel)}</span>
+      <span class="ticket-kind ${kind === 'reentry' ? 'badge-ok' : ''}">${esc(kindLabel)}</span>
     </div>
+    ${pr ? `<div class="note success mt-2 mb-2" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.3)">
+      ${icon('check')} <span><strong>Preço voltou ao patamar original!</strong> Você ignorou porque o preço andou, mas após <strong>${esc(pr.duration_formatted)}</strong> o ativo retornou a <strong>${f.brl(pr.returned_price)}</strong> (entrada original ${f.brl(pr.entry_price)}).</span>
+    </div>` : ''}
     <div class="ticket-asset">
       <span class="ticker">${esc(sig.ticker)}</span>
       <span class="badge ${sig.lado === 'SELL' ? 'badge-sell' : 'badge-buy'}">${sig.lado === 'SELL' ? 'Venda' : 'Compra'}</span>
@@ -181,7 +186,7 @@ export function openExitOrder(pos) {
 }
 
 // ---------- Interações (delegação de eventos)
-const IGNORE_REASONS = ['Preço já andou demais', 'Sem capital livre', 'Não gosto do ativo', 'Perdi o horário', 'Outro motivo'];
+const IGNORE_REASONS = ['Preço já andou demais', 'Trade semelhante em aberto', 'Sem capital livre', 'Não gosto do ativo', 'Perdi o horário', 'Outro motivo'];
 const SNOOZE = [[30, '30 minutos'], [60, '1 hora'], [180, '3 horas'], [60 * 18, 'Amanhã cedo']];
 
 async function refreshTicket(card) {
@@ -256,6 +261,14 @@ export function bindTickets(root, { getPositions = () => [] } = {}) {
         try {
           await post(`/api/signals/${encodeURIComponent(sig.id)}/link-position`, { cycle_id: btn.dataset.position });
           toast(`Sinal de ${sig.trader} vinculado à sua posição em ${sig.ticker} e marcado como executado.`, 'success');
+          emit('data-changed');
+        } catch (err) { toastError(err); }
+        return;
+      }
+      if (action === 'ignore-similar') {
+        try {
+          await post(`/api/signals/${encodeURIComponent(sig.id)}/decision`, { status: 'ignored', reason: 'Trade semelhante em aberto' });
+          toast(`${sig.ticker} ignorado (Trade semelhante em aberto)`, 'info');
           emit('data-changed');
         } catch (err) { toastError(err); }
         return;

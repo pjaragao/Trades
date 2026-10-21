@@ -222,6 +222,26 @@ MIGRATIONS = [
     ALTER TABLE notes ADD COLUMN undo_json TEXT;
     ALTER TABLE notes ADD COLUMN irrf_day REAL;
     """,
+    # v5 — histórico de sinais que voltaram ao preço de entrada após serem ignorados por preço
+    """
+    CREATE TABLE IF NOT EXISTS signal_price_returns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        signal_id TEXT NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
+        ticker TEXT NOT NULL,
+        side TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
+        entry_price REAL NOT NULL,
+        ignored_price REAL,
+        returned_price REAL NOT NULL,
+        decided_at TEXT NOT NULL,
+        returned_at TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        notified INTEGER NOT NULL DEFAULT 0,
+        dismissed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_returns_signal ON signal_price_returns(signal_id);
+    CREATE INDEX IF NOT EXISTS idx_returns_ticker ON signal_price_returns(ticker);
+    """,
 ]
 
 

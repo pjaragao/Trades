@@ -71,7 +71,7 @@ function taxCard(ir) {
       <div><div class="muted">Prejuízo a compensar</div><div class="mono" style="font-size:1.2rem">${f.brl(ir.loss_carry.swing + ir.loss_carry.day)}</div>
         <div class="hint">swing ${f.brl(ir.loss_carry.swing)} · day trade ${f.brl(ir.loss_carry.day)}</div></div>
       <div><div class="muted">Notas de corretagem</div><div class="mono" style="font-size:1.2rem">${cov.days_covered} de ${cov.days_total} pregões</div>
-        <div class="hint">${cov.missing.length ? `faltam ${cov.missing.length} — sem elas o IR é estimado` : 'IR fechado com as notas'}</div></div>
+        <div class="hint">${cov.missing.length ? `faltam ${cov.missing.length} (${cov.missing.slice(0, 2).map((d) => d.tickers?.join(', ') || d.date).join(' · ')}${cov.missing.length > 2 ? '…' : ''}) — sem elas o IR é estimado` : 'IR fechado com as notas'}</div></div>
     </div></div></section>`;
 }
 

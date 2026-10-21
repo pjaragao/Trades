@@ -75,7 +75,15 @@ def today():
     fresh_hours = prefs["follow"]["fresh_hours"]
     linked = {sid for p in positions for sid in p["signal_ids"]}
 
-    new_signals, reminders, inbox = [], [], 0
+    from src.services import price_returns
+
+    try:
+        price_returns.check_price_returns()
+    except Exception:
+        pass
+    active_ret = {r["signal_id"]: r for r in price_returns.active_price_returns()}
+
+    new_signals, reminders, price_returned_signals, inbox = [], [], [], 0
     for s in open_sigs:
         d = s.get("decision")
         if s["id"] in linked and not d:  # já é uma posição minha
@@ -93,12 +101,17 @@ def today():
             if remind and remind <= now:
                 s["ticket"] = ticket_for(s, prefs, exposure, profiles)
                 reminders.append(s)
+        elif d["status"] == "ignored" and s["id"] in active_ret:
+            ret_info = active_ret[s["id"]]
+            s["price_return"] = ret_info
+            s["ticket"] = ticket_for(s, prefs, exposure, profiles)
+            price_returned_signals.append(s)
 
     from src.execution.orders import execution_state, open_orders_index
 
     ex_state = execution_state(prefs)
     idx = open_orders_index(ex_state["account"]) if ex_state["mode"] != "off" else {}
-    for s in new_signals + reminders:
+    for s in new_signals + reminders + price_returned_signals:
         s["open_orders"] = idx.get(s["id"], [])
 
     exits = []
@@ -110,6 +123,8 @@ def today():
     return jsonify({
         "new_signals": new_signals,
         "reminders": reminders,
+        "price_returns": price_returned_signals,
+        "price_returns_history": price_returns.list_price_returns(limit=10),
         "exits_pending": exits,
         "positions": positions,
         "summary": portfolio.summary(),

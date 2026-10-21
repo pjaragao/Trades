@@ -59,7 +59,8 @@ export default {
     let lastJson = '';
 
     const render = () => {
-      const actions = data.exits_pending.length + data.new_signals.length + data.reminders.length;
+      const priceReturns = data.price_returns || [];
+      const actions = data.exits_pending.length + data.new_signals.length + data.reminders.length + priceReturns.length;
       const newIds = data.new_signals.map((s) => s.id);
       root.innerHTML = `
         <div class="hero">
@@ -76,6 +77,7 @@ export default {
         <section class="section">
           <div class="section-title"><h2>${icon('zap')} Precisa de você${actions ? ` <span class="count">${actions}</span>` : ''}</h2></div>
           ${actions ? `<div class="action-grid">
+            ${priceReturns.map((s) => ticketCard(s, { kind: 'reentry' })).join('')}
             ${data.exits_pending.map((p) => exitCard(p)).join('')}
             ${data.reminders.map((s) => ticketCard(s, { kind: 'reminder' })).join('')}
             ${data.new_signals.map((s) => ticketCard(s, { kind: 'new', isNew: seen.size > 0 && !seen.has(s.id) })).join('')}

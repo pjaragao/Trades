@@ -100,6 +100,8 @@ def test_month_closes_only_when_every_trading_day_has_a_note(tmp_db):
     rep = irpf.report()
     oct_ = next(m for m in rep["months"] if m["month"] == "2026-10")
     assert oct_["status"] == "estimado" and [d["date"] for d in oct_["missing_days"]] == ["2026-10-09"]
+    assert oct_["missing_days"][0]["tickers"] == ["NATUK800"]
+    assert rep["coverage"]["missing"][0]["tickers"] == ["NATUK800"]
     sell = "1-BOVESPA V OPCAO DE COMPRA 11/26 NATUK800 ON 8,00 NATU 2.600 0,50 1.300,00 C"
     bn.apply_preview(preview(xp_note([sell], date_br="09/10/2026", number="75104999")))
     oct_ = next(m for m in irpf.report()["months"] if m["month"] == "2026-10")
