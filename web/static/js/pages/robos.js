@@ -45,7 +45,15 @@ export default {
         <div class="tabs" role="tablist">${TABS.map(([k, l, ic]) => `<button data-tab="${k}" class="${k === tab ? 'active' : ''}">${icon(ic)} ${esc(l)}</button>`).join('')}</div>
         <div id="rl-body"></div>`;
 
-      root.querySelector('#rl-sym').onchange = (e) => { selectedSym = e.target.value; renderTab(); };
+      root.querySelector('#rl-sym').onchange = (e) => {
+        selectedSym = e.target.value;
+        const availTfs = Object.keys(data.arena_by_symbol?.[selectedSym]?.by_timeframe || {});
+        if (availTfs.length && !availTfs.includes(selectedTf)) {
+          selectedTf = availTfs.includes('5m') ? '5m' : availTfs[0];
+          root.querySelector('#rl-tf').value = selectedTf;
+        }
+        renderTab();
+      };
       root.querySelector('#rl-tf').onchange = (e) => { selectedTf = e.target.value; renderTab(); };
       root.querySelector('.tabs').onclick = (e) => {
         const b = e.target.closest('[data-tab]');
@@ -96,13 +104,13 @@ export default {
             </div>
             <div class="card tile">
               <div class="tile-label">Melhor Robô Fixo (${esc(sBot.bot_id)})</div>
-              <div class="tile-value ${f.tone(sBot.metrics.total_return_pct)}">${f.pct(sBot.metrics.total_return_pct)}</div>
+              <div class="tile-value ${f.tone(sBot.metrics.total_return_pct)}">${sBot.metrics.total_points ? `${f.num(sBot.metrics.total_points, 1)} pts` : f.pct(sBot.metrics.total_return_pct)}</div>
               <div class="tile-sub">${esc(sBot.bot_name)} · Acerto ${f.num(sBot.metrics.win_rate_pct, 1)}% · PF ${f.num(sBot.metrics.profit_factor, 2)}</div>
             </div>
             <div class="card tile">
               <div class="tile-label">Meta-Seletor Causal (Sem Futuro)</div>
-              <div class="tile-value ${f.tone(cSel.total_return_pct)}">${f.pct(cSel.total_return_pct)}</div>
-              <div class="tile-sub">Acerto ${f.num(cSel.win_rate_pct, 1)}% · PF ${f.num(cSel.profit_factor, 2)} · DD ${f.num(cSel.max_drawdown_pct, 1)}%</div>
+              <div class="tile-value ${f.tone(cSel.total_return_pct)}">${cSel.total_points ? `${f.num(cSel.total_points, 1)} pts` : f.pct(cSel.total_return_pct)}</div>
+              <div class="tile-sub">Acerto ${f.num(cSel.win_rate_pct, 1)}% · PF ${f.num(cSel.profit_factor, 2)} · DD ${f.num(cSel.max_drawdown_pct, 2)}%</div>
             </div>
             <div class="card tile">
               <div class="tile-label">Oráculo Ex-Post (Sabendo o Mês)</div>

@@ -101,13 +101,13 @@ def apply_universal_filters(
     elif volat == "atr_contracting":
         sig = np.where(atr5 > atr20 * 1.10, 0, sig)
 
-    # 4. Filtro de Horário/Sessão (apenas para timeframes intraday)
-    if timeframe in ("5m", "15m", "60m") and filters.session_filter != "all_day":
+    # 4. Filtro de Horário/Sessão (para todos os timeframes intraday: 1m, 2m, 3m, 5m, 15m, 60m)
+    if timeframe in ("1m", "2m", "3m", "5m", "15m", "60m") and filters.session_filter != "all_day":
         hours = df.index.hour.to_numpy()
         if filters.session_filter == "golden_hour_morning":
-            sig = np.where((hours < 10) | (hours >= 13), 0, sig)
+            sig = np.where((hours < 9) | (hours >= 12), 0, sig)
         elif filters.session_filter == "afternoon_calm":
-            sig = np.where((hours < 12) | (hours >= 16), 0, sig)
+            sig = np.where((hours < 13) | (hours >= 16), 0, sig)
 
     # 5. Modo de Direção (Long+Short, Long Only, Short Only)
     if filters.side_mode == "long_only":

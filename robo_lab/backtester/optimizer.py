@@ -50,7 +50,7 @@ def build_filter_bank(timeframe: str = "1d", thorough: bool = True) -> List[Filt
         FilterConfig("er_low_noise", "none", "none", "all_day", "long_only"),
         FilterConfig("er_high_trend", "vol_above_avg", "none", "all_day", "both"),
     ]
-    if timeframe in ("5m", "15m", "60m") and thorough:
+    if timeframe in ("1m", "2m", "3m", "5m", "15m", "60m") and thorough:
         bank.extend([
             FilterConfig("none", "vol_above_avg", "none", "golden_hour_morning", "both"),
             FilterConfig("ema20_50_align", "vol_above_avg", "none", "golden_hour_morning", "both"),
@@ -76,6 +76,7 @@ def exhaust_bot_parameters_and_filters(
     df: pd.DataFrame,
     bot_id: str,
     timeframe: str = "1d",
+    symbol: str = "^BVSP",
     max_param_combos: int = 8,
     thorough_filters: bool = True,
 ) -> Dict[str, Any]:
@@ -92,14 +93,14 @@ def exhaust_bot_parameters_and_filters(
     filter_bank = build_filter_bank(timeframe=timeframe, thorough=thorough_filters)
 
     baseline_run = run_bot_backtest(
-        df, bot_id, params=bot_spec.default_params, filters=FilterConfig(), timeframe=timeframe, include_trades_list=True
+        df, bot_id, params=bot_spec.default_params, filters=FilterConfig(), timeframe=timeframe, symbol=symbol, include_trades_list=True
     )
 
     all_runs: List[Dict[str, Any]] = []
     for p_combo in param_combos:
         for f_cfg in filter_bank:
             res = run_bot_backtest(
-                df, bot_id, params=p_combo, filters=f_cfg, timeframe=timeframe, include_trades_list=False
+                df, bot_id, params=p_combo, filters=f_cfg, timeframe=timeframe, symbol=symbol, include_trades_list=False
             )
             if res["summary"]["trades"] >= 3:
                 all_runs.append(res)
@@ -120,6 +121,7 @@ def exhaust_bot_parameters_and_filters(
         params=best_cfg["params"],
         filters=FilterConfig(**best_cfg["filters"]),
         timeframe=timeframe,
+        symbol=symbol,
         include_trades_list=True,
     )
 
@@ -211,6 +213,7 @@ def simulate_causal_adaptive_meta_bot(
     df: pd.DataFrame,
     bot_optimizations: List[Dict[str, Any]],
     timeframe: str = "1d",
+    symbol: str = "^BVSP",
     initial_capital: float = BACKTEST_DEFAULTS["initial_capital"],
 ) -> Dict[str, Any]:
     """
@@ -249,6 +252,7 @@ def simulate_causal_adaptive_meta_bot(
             params=c_cfg["params"],
             filters=FilterConfig(**c_cfg["filters"]),
             timeframe=timeframe,
+            symbol=symbol,
             include_trades_list=True,
         )
         causal_specialists[reg] = {
@@ -257,6 +261,7 @@ def simulate_causal_adaptive_meta_bot(
             "bot_name": best_c["bot_name"],
             "family": best_c["family"],
             "params": c_cfg["params"],
+            "filters": c_cfg["filters"],
             "filter_label": c_cfg["filter_label"],
             "regime_metrics": c_cfg["metrics"],
             "trades_in_regime": [t for t in c_run["trades"] if t["causal_regime"] == reg],
@@ -277,6 +282,7 @@ def simulate_causal_adaptive_meta_bot(
             params=e_cfg["params"],
             filters=FilterConfig(**e_cfg["filters"]),
             timeframe=timeframe,
+            symbol=symbol,
             include_trades_list=True,
         )
         expost_specialists[reg] = {
@@ -285,6 +291,7 @@ def simulate_causal_adaptive_meta_bot(
             "bot_name": best_e["bot_name"],
             "family": best_e["family"],
             "params": e_cfg["params"],
+            "filters": e_cfg["filters"],
             "filter_label": e_cfg["filter_label"],
             "regime_metrics": e_cfg["metrics"],
             "trades_in_regime": [t for t in e_run["trades"] if t["expost_regime"] == reg],
@@ -384,6 +391,7 @@ def run_arena_analysis(
     para todos os 10 robôs do canal @norisknogainoficial em múltiplos timeframes.
     """
     feed = MultiTimeframeDataFeed()
+    symbol = feed.normalize_symbol(symbol)
     tfs = timeframes or ["5m", "15m", "60m", "1d", "1wk"]
 
     results_by_tf: Dict[str, Any] = {}
@@ -402,8 +410,9 @@ def run_arena_analysis(
                 df,
                 bot.bot_id,
                 timeframe=tf,
+                symbol=symbol,
                 max_param_combos=max_param_combos,
-                thorough_filters=(tf in ("15m", "60m", "1d")),
+                thorough_filters=(tf in ("1m", "2m", "3m", "5m", "15m", "60m", "1d")),
             )
             bot_results.append(opt)
 
@@ -415,7 +424,7 @@ def run_arena_analysis(
             reverse=True,
         )
 
-        meta_selector = simulate_causal_adaptive_meta_bot(df, bot_results, timeframe=tf)
+        meta_selector = simulate_causal_adaptive_meta_bot(df, bot_results, timeframe=tf, symbol=symbol)
 
         # Campeões por Perfil do Dia (Volume Alto/Baixo e Direção do Pregão)
         vol_champions = {}

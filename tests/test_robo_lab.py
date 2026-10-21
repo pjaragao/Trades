@@ -122,3 +122,7 @@ def test_web_robo_lab_api_endpoints():
     r_mq5 = client.get("/api/robos/export-mql5/NRNG-009?symbol=WIN$N&timeframe=15m")
     assert r_mq5.status_code == 200
     assert "DetectCausalMarketRegime" in r_mq5.get_json()["mql5_code"]
+    assert "WIN$N" in data["arena_by_symbol"]
+    assert "WDO$N" in data["arena_by_symbol"]
+    assert set(data["arena_by_symbol"]["WIN$N"]["by_timeframe"].keys()) >= {"1m", "2m", "3m", "5m", "15m"}
+    assert set(data["arena_by_symbol"]["WDO$N"]["by_timeframe"].keys()) >= {"1m", "2m", "3m", "5m", "15m"}

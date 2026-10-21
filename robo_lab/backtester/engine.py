@@ -1,6 +1,7 @@
 """
-Motor de Backtest Rápido e Robusto para Day Trade e Swing Trade na B3.
+Motor de Backtest Rápido e Robusto para Day Trade (Futuros WIN$N / WDO$N e Ações) e Swing Trade na B3.
 Simula entradas, alvos (Take Profit), stops (Stop Loss), saídas por tempo (Time Exit),
+zeragem compulsória de fim de pregão (Day Trade End-of-Day Flat nos tempos curtos 1m, 2m, 3m, 5m, 15m),
 custos operacionais da B3 + slippage e segmenta automaticamente todos os resultados por:
 - Sentimento de Mercado Ex-Post (Mês de ALTA, BAIXA, LATERAL)
 - Sentimento de Mercado Causal (Zero Look-Ahead: ALTA, BAIXA, LATERAL)
@@ -12,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from robo_lab.config import BACKTEST_DEFAULTS
+from robo_lab.config import BACKTEST_DEFAULTS, FUTURES_SPECS
 from robo_lab.strategies.base_bot import FilterConfig, apply_universal_filters
 from robo_lab.strategies.bots_norisknogain import BOT_SIGNAL_FUNCTIONS, get_bot_by_id
 
@@ -26,6 +27,8 @@ def _compute_slice_metrics(trades: List[Dict[str, Any]], initial_capital: float 
             "avg_return_pct": 0.0,
             "total_return_pct": 0.0,
             "net_pnl_brl": 0.0,
+            "total_points": 0.0,
+            "pnl_1_contract_brl": 0.0,
             "profit_factor": 0.0,
             "payoff_ratio": 0.0,
             "expectancy_pct": 0.0,
@@ -36,6 +39,8 @@ def _compute_slice_metrics(trades: List[Dict[str, Any]], initial_capital: float 
 
     rets = np.array([t["net_return_pct"] for t in trades], dtype=float)
     pnls = np.array([t["net_pnl_brl"] for t in trades], dtype=float)
+    pts = np.array([t.get("net_points", 0.0) for t in trades], dtype=float)
+    pnl_1c = np.array([t.get("pnl_1_contract_brl", 0.0) for t in trades], dtype=float)
 
     wins = rets[rets > 0]
     losses = rets[rets <= 0]
@@ -79,6 +84,8 @@ def _compute_slice_metrics(trades: List[Dict[str, Any]], initial_capital: float 
         "avg_return_pct": round(expectancy_pct, 3),
         "total_return_pct": round(total_return_pct, 2),
         "net_pnl_brl": round(total_pnl, 2),
+        "total_points": round(float(pts.sum()), 1),
+        "pnl_1_contract_brl": round(float(pnl_1c.sum()), 2),
         "profit_factor": round(min(profit_factor, 99.9), 2),
         "payoff_ratio": round(min(payoff, 99.9), 2),
         "expectancy_pct": round(expectancy_pct, 3),
@@ -94,12 +101,16 @@ def run_bot_backtest(
     params: Optional[Dict[str, Any]] = None,
     filters: Optional[FilterConfig] = None,
     timeframe: str = "1d",
+    symbol: str = "^BVSP",
+    slippage_ticks: float = 1.0,
     initial_capital: float = BACKTEST_DEFAULTS["initial_capital"],
     position_size_pct: float = BACKTEST_DEFAULTS["position_size_pct"],
     include_trades_list: bool = True,
 ) -> Dict[str, Any]:
     """
     Executa a simulação barra a barra (com sinais pré-vetorizados) de um robô do catálogo.
+    Nos timeframes curtos de Day Trade ('1m', '2m', '3m', '5m', '15m'), aplica zeragem compulsória no fim do dia.
+    Para WIN$N e WDO$N, calcula também os pontos líquidos e o resultado em R$ por mini-contrato.
     """
     bot_spec = get_bot_by_id(bot_id)
     sig_fn = BOT_SIGNAL_FUNCTIONS[bot_id]
@@ -133,13 +144,29 @@ def run_bot_backtest(
     h = df["high"].to_numpy()
     l = df["low"].to_numpy()
     ts_index = df.index
+    days_arr = ts_index.date
 
     expost_reg = df["expost_regime"].to_numpy()
     causal_reg = df["causal_regime"].to_numpy()
     vol_prof = df["volume_profile"].to_numpy()
     day_dir = df["day_direction_profile"].to_numpy()
 
-    roundtrip_cost_pct = 2.0 * (BACKTEST_DEFAULTS["b3_fee_pct_per_side"] + BACKTEST_DEFAULTS["slippage_pct_per_side"]) * 100.0
+    norm_sym = symbol.strip().upper()
+    fut_spec = FUTURES_SPECS.get(norm_sym)
+    slip_mult = max(0.5, float(slippage_ticks))
+    if fut_spec is not None:
+        cost_in_points = fut_spec["tick_size"] * slip_mult
+        ref_px = float(c[0]) if len(c) > 0 and c[0] > 0 else 100000.0
+        roundtrip_cost_pct = (2.0 * fut_spec["fee_pct_per_side"] * 100.0) + ((cost_in_points / ref_px) * 100.0)
+        point_val_brl = fut_spec["point_value_brl"]
+        extra_stop_slip = fut_spec["tick_size"] * max(0.0, slip_mult - 1.0) * 0.5
+    else:
+        roundtrip_cost_pct = 2.0 * (BACKTEST_DEFAULTS["b3_fee_pct_per_side"] + BACKTEST_DEFAULTS["slippage_pct_per_side"] * slip_mult) * 100.0
+        cost_in_points = 0.0
+        point_val_brl = 1.0
+        extra_stop_slip = 0.0
+
+    is_daytrade_tf = timeframe in ("1m", "2m", "3m", "5m", "15m")
     trade_capital = initial_capital * position_size_pct
 
     trades: List[Dict[str, Any]] = []
@@ -152,7 +179,11 @@ def run_bot_backtest(
             i += 1
             continue
 
-        # Entrada no fechamento da barra de sinal (ou abertura da barra seguinte, sem look-ahead)
+        # Em Day Trade, evita abrir posição na última barra do dia
+        if is_daytrade_tf and days_arr[i + 1] != days_arr[i]:
+            i += 1
+            continue
+
         entry_idx = i
         entry_price = float(c[entry_idx])
         if entry_price <= 0:
@@ -174,10 +205,10 @@ def run_bot_backtest(
             bar_o = float(o[j])
 
             if side == 1:
-                # Verifica stop loss primeiro (conservadorismo quantitativo)
                 if bar_l <= stop_price:
                     exit_idx = j
-                    exit_price = min(bar_o, stop_price) if bar_o < stop_price else stop_price
+                    base_px = min(bar_o, stop_price) if bar_o < stop_price else stop_price
+                    exit_price = base_px - extra_stop_slip
                     exit_reason = "STOP_LOSS"
                     break
                 if bar_h >= target_price:
@@ -188,7 +219,8 @@ def run_bot_backtest(
             else:
                 if bar_h >= stop_price:
                     exit_idx = j
-                    exit_price = max(bar_o, stop_price) if bar_o > stop_price else stop_price
+                    base_px = max(bar_o, stop_price) if bar_o > stop_price else stop_price
+                    exit_price = base_px + extra_stop_slip
                     exit_reason = "STOP_LOSS"
                     break
                 if bar_l <= target_price:
@@ -197,12 +229,22 @@ def run_bot_backtest(
                     exit_reason = "TAKE_PROFIT"
                     break
 
-            # Se aparecer sinal contrário forte, encerra no fechamento da barra j
+            # Zeragem Compulsória Day Trade no fechamento da última barra do pregão
+            if is_daytrade_tf and (j == n - 1 or days_arr[j + 1] != days_arr[entry_idx]):
+                exit_idx = j
+                exit_price = float(c[j])
+                exit_reason = "EOD_DAYTRADE_FLAT"
+                break
+
             if entry_signals[j] == -side:
                 exit_idx = j
                 exit_price = float(c[j])
                 exit_reason = "REVERSE_SIGNAL"
                 break
+
+        gross_points = side * (exit_price - entry_price)
+        net_points = gross_points - cost_in_points
+        pnl_1_contract_brl = net_points * point_val_brl
 
         gross_ret_pct = side * ((exit_price - entry_price) / entry_price) * 100.0
         net_ret_pct = gross_ret_pct - roundtrip_cost_pct
@@ -217,6 +259,9 @@ def run_bot_backtest(
             "exit_price": round(exit_price, 2),
             "hold_bars": int(exit_idx - entry_idx),
             "exit_reason": exit_reason,
+            "gross_points": round(gross_points, 2),
+            "net_points": round(net_points, 2),
+            "pnl_1_contract_brl": round(pnl_1_contract_brl, 2),
             "gross_return_pct": round(gross_ret_pct, 3),
             "net_return_pct": round(net_ret_pct, 3),
             "net_pnl_brl": round(net_pnl_brl, 2),
@@ -230,7 +275,6 @@ def run_bot_backtest(
 
     summary = _compute_slice_metrics(trades, initial_capital)
 
-    # Segmentações por Regime Ex-Post, Regime Causal, Volume e Direção do Dia
     by_expost = {
         reg: _compute_slice_metrics([t for t in trades if t["expost_regime"] == reg], initial_capital)
         for reg in ("ALTA", "LATERAL", "BAIXA")
