@@ -13,6 +13,7 @@ import portfolio from './pages/portfolio.js';
 import results from './pages/results.js';
 import ir from './pages/ir.js';
 import lab from './pages/lab.js';
+import robos from './pages/robos.js';
 import settings from './pages/settings.js';
 
 const ROUTES = [
@@ -22,6 +23,7 @@ const ROUTES = [
   { path: 'resultados', label: 'Resultados', icon: 'chart', page: results },
   { path: 'ir', label: 'IR', longLabel: 'Notas e IR', icon: 'receipt', page: ir },
   { path: 'laboratorio', label: 'Laboratório', icon: 'flask', page: lab, sep: true, desktopOnly: true },
+  { path: 'robos', label: 'Robôs B3', longLabel: 'Robôs & Regimes (YouTube Lab)', icon: 'brain', page: robos, desktopOnly: true },
   { path: 'configuracoes', label: 'Config.', longLabel: 'Configurações', icon: 'settings', page: settings },
 ];
 

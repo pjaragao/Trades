@@ -40,10 +40,11 @@ def create_app(start_monitor: bool = True, db_path=None) -> Flask:
     from web.api.portfolio_api import bp as portfolio_bp
     from web.api.quotes_api import bp as quotes_bp
     from web.api.results_api import bp as results_bp
+    from web.api.robo_lab_api import bp as robo_lab_bp
     from web.api.settings_api import bp as settings_bp
     from web.api.signals_api import bp as signals_bp
 
-    for bp in (core_bp, signals_bp, portfolio_bp, alerts_bp, settings_bp, results_bp, lab_bp, execution_bp, notes_bp, quotes_bp, ir_bp):
+    for bp in (core_bp, signals_bp, portfolio_bp, alerts_bp, settings_bp, results_bp, lab_bp, robo_lab_bp, execution_bp, notes_bp, quotes_bp, ir_bp):
         app.register_blueprint(bp)
 
     @app.errorhandler(ValueError)
