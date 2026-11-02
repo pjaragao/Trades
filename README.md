@@ -176,6 +176,27 @@ reconhecido, a prévia pede para você digitar.
 
 Simplificações: FIIs, ETFs e BDRs entram como ações. Confira com seu contador.
 
+## Skills do Claude Code (revisar antes de copiar)
+
+Quatro skills em `.claude/skills/`, adaptadas do [day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill)
+(MIT) para a B3 e para o fluxo do Copiloto. O TradingFloors não publica stop nem alvo, então o plano sai do histórico
+do próprio analista ou do ATR do ativo. Nenhuma delas envia ordem.
+
+| skill | o que faz | núcleo |
+| --- | --- | --- |
+| `/copiloto-sinal` | revisão completa de um sinal: analista → plano → Máquina do Tempo → risco → boleta | `src/lab/signal_review.py` |
+| `/copiloto-maquina-do-tempo` | 10.000 replays Monte Carlo (swing diário ou intraday 5 min; opções por Black-Scholes) | `src/lab/timemachine.py` |
+| `/copiloto-analista` | acerto, payoff, t (edge ou sorte?), copiável à mão, ranking por classe | `src/lab/analyst_history.py` |
+| `/copiloto-risco` | quantidade pelo risco até o stop + APROVADO/BLOQUEADO (limites em `limites.json`) | `src/services/pretrade.py` |
+
+```bash
+python .claude/skills/copiloto-sinal/sinal.py --abertos
+python .claude/skills/copiloto-sinal/sinal.py --id <id do sinal>
+```
+
+Fora do servidor o banco local não tem execuções: a checagem avisa que não conferiu carteira e perda do dia
+(`--db` aponta para uma cópia do `app.db`).
+
 ## Estrutura
 
 ```
@@ -187,7 +208,7 @@ src/
   integrations/            # cliente TradingFloors + deduplicação única, fontes de cotação (MT5, brapi)
   services/                # monitor, cotações ao vivo, boleta, diário/posições, carteira, alertas, IR, resultados, notas
   execution/               # Fase 6: ordens, risco, automação, conectores (simulação, MT5 local/remoto), agente MT5
-  lab/                     # backtest de cópia, taxas BCB, TimesFM sob demanda
+  lab/                     # backtest de cópia, Máquina do Tempo, histórico de analista, taxas BCB, TimesFM
 strategies/                # screeners, backtest de opções, base de conhecimento, ingestão YouTube
 web/                       # Flask (app, auth, api/) + interface (templates/, static/)
 tests/                     # pytest
