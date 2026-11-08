@@ -93,7 +93,7 @@ class TimesFMPredictor:
             "ECOR": "ECOR3.SA",
             "SEER": "SEER3.SA",
             "AXIA": "AXIA3.SA",
-            "SAUD": "QUAL3.SA",
+            "SAUD": "SAUD3.SA",
             "CMIN": "CMIN3.SA",
             "SIMH": "SIMH3.SA",
             "VAMO": "VAMO3.SA",

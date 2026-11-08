@@ -1,0 +1,12 @@
+{
+  "risco_max_trade": 100.0,
+  "perda_max_dia": 300.0,
+  "rr_min": 1.0,
+  "margem_acerto": 5.0,
+  "min_historico": 20,
+  "exige_stop": true,
+  "entradas_max_dia": 3,
+  "sem_entrada_antes": "10:15",
+  "sem_entrada_depois": "16:30",
+  "dias_min_vencimento": 5
+}

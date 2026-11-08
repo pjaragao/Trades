@@ -42,6 +42,7 @@
 - **Guarded automation**: when *armed*, it can auto-send entries and exits under daily limits (entries per day, daily loss, value per order, exposure) and slippage bounds. Every decision is logged and a **panic button** disarms and cancels everything.
 - **Brazilian tax engine**: monthly calculation with a calculation memo for stocks (R$ 20k monthly exemption), options, day trade, loss carry-forward (swing and day trade separate), withholding tax, DARF 6015 and annual summary. A month only counts as *closed* when every trading day has an imported note.
 - **Brokerage note import** (SINACOR-style PDFs, password-protected supported): the note is the source of truth, with undo.
+- **Review before copying (Claude Code skills)**: `/copiloto-sinal`, `/copiloto-maquina-do-tempo`, `/copiloto-analista` and `/copiloto-risco` in `.claude/skills/` give the analyst's track record with a t-statistic, a 10,000-run Monte Carlo of the trade (daily or 5-minute bars; options repriced with Black-Scholes), a position size capped by the loss to the stop, and a PASS/BLOCK with reasons. The signal feed publishes no stop or target, so the plan comes from you, the analyst's own exit history or the ATR. Adapted from [day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill) (MIT). None of them sends orders.
 
 ## 🏗️ Architecture
 
@@ -63,10 +64,11 @@ src/core/                  config, DB + migrations, B3 calendar, tickers/options
 src/integrations/          signal-feed client with deduplication, quote sources (MT5, brapi)
 src/services/              monitor, live quotes, ticket, journal/positions, portfolio, alerts, tax, results, notes
 src/execution/             orders, risk, automation, connectors (paper, MT5 local/remote), MT5 agent
-src/lab/                   copy-trading backtest, central-bank rates, on-demand TimesFM forecast
+src/lab/                   copy-trading backtest, Monte Carlo trade replay, analyst history, central-bank rates, TimesFM
 strategies/                screeners, options backtest, knowledge base, YouTube ingestion
 web/                       Flask app, auth, API, templates and static UI
 tests/                     pytest suite
+.claude/skills/            Claude Code skills: signal review, Monte Carlo, analyst stats, pre-trade risk
 ```
 
 Positions and P&L are always recomputed from executions (average price with costs; day trade separated from swing per day, as in tax filing).
